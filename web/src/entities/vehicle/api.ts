@@ -39,9 +39,13 @@ export const vehicleApi = {
   remove: (api: Api, id: string) => api.request<void>(vehiclePath(id), { method: 'DELETE' }),
 };
 
-export function useCars() {
+export function useCars(refreshOnMount = false) {
   const { api } = useSession();
-  return useQuery({ queryKey: vehicleKeys.list, queryFn: () => vehicleApi.list(api) });
+  return useQuery({
+    queryKey: vehicleKeys.list,
+    queryFn: () => vehicleApi.list(api),
+    ...(refreshOnMount ? { refetchOnMount: 'always' as const } : {}),
+  });
 }
 
 export function useCar(id: string) {

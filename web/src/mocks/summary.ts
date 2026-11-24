@@ -1,6 +1,6 @@
 import type { Car, Summary } from '@/entities/vehicle/api';
 
-type SummaryInput = Pick<Car, 'id' | 'price' | 'expenses_reviewed' | 'benefits_reviewed'> & {
+export type SummaryInput = Pick<Car, 'id' | 'price' | 'expenses_reviewed' | 'benefits_reviewed'> & {
   expenses: readonly Pick<Car['expenses'][number], 'amount'>[];
   benefits: readonly Pick<Car['benefits'][number], 'amount'>[];
 };

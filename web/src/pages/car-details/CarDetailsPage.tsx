@@ -1,5 +1,5 @@
-import { Link as RouterLink, useParams } from 'react-router';
-import { useState } from 'react';
+import { Link as RouterLink, useLocation, useParams } from 'react-router';
+import { useEffect, useState } from 'react';
 import { useCar, useCarSummary } from '@/entities/vehicle/api';
 import type { Car } from '@/entities/vehicle/api';
 import {
@@ -91,8 +91,16 @@ function VehicleDetails({
 }) {
   const [editing, setEditing] = useState(false);
   const summary = useCarSummary(car.id);
+  const { hash } = useLocation();
   const name = vehicleName(car);
   const original = originalListing(car);
+
+  useEffect(() => {
+    const target = hash.slice(1);
+    if (!['expenses', 'benefits', 'notes'].includes(target)) return;
+    const frame = requestAnimationFrame(() => document.getElementById(target)?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [car.id, hash]);
 
   return (
     <Stack gap="roomy">

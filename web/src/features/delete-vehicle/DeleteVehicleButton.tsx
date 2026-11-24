@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { comparisonsWithVehicle } from '@/entities/comparison/keys';
 import { useSession } from '@/entities/session/SessionBoundary';
 import { vehicleApi, vehicleKeys } from '@/entities/vehicle/api';
 import type { Car } from '@/entities/vehicle/api';
@@ -26,6 +27,7 @@ export function DeleteVehicleButton({
       queryClient.removeQueries({ queryKey: vehicleKeys.detail(car.id) });
       queryClient.removeQueries({ queryKey: vehicleKeys.summary(car.id) });
       onRemoved(car.id);
+      queryClient.removeQueries(comparisonsWithVehicle(car.id));
       await queryClient.invalidateQueries({ queryKey: vehicleKeys.list, exact: true });
     },
   });

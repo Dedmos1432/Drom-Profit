@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { comparisonsWithVehicle } from '@/entities/comparison/keys';
 import { useSession } from '@/entities/session/SessionBoundary';
 import { vehicleApi, vehicleKeys } from './api';
 import type { VehicleClient } from './api';
@@ -15,15 +16,17 @@ export function useVehicleMutation<Input, Result>(
     scope: { id: 'vehicle:' + id },
     mutationFn: (input: Input) => update(api, id, input),
     async onSuccess() {
-      const keys = affectsSummary
-        ? [vehicleKeys.detail(id), vehicleKeys.summary(id), vehicleKeys.list]
-        : [vehicleKeys.detail(id)];
-      await Promise.all(
-        keys.map((queryKey) => queryClient.cancelQueries({ queryKey, exact: true })),
-      );
-      await Promise.all(
-        keys.map((queryKey) => queryClient.invalidateQueries({ queryKey, exact: true })),
-      );
+      const detail = { queryKey: vehicleKeys.detail(id), exact: true };
+      const filters = affectsSummary
+        ? [
+            detail,
+            { queryKey: vehicleKeys.summary(id), exact: true },
+            { queryKey: vehicleKeys.list, exact: true },
+            comparisonsWithVehicle(id),
+          ]
+        : [detail];
+      await Promise.all(filters.map((filter) => queryClient.cancelQueries(filter)));
+      await Promise.all(filters.map((filter) => queryClient.invalidateQueries(filter)));
     },
   });
 }

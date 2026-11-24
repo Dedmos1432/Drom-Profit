@@ -1,0 +1,93 @@
+.scroller {
+  --label-width: var(--dp-layout-comparison-label-min);
+  scroll-padding-inline-start: var(--label-width);
+}
+
+.table {
+  table-layout: fixed;
+  --vehicle-min: calc(var(--dp-layout-comparison-vehicle-min) + 2 * var(--dp-spacing-small));
+  min-inline-size: calc(var(--label-width) + var(--comparison-columns) * var(--vehicle-min));
+}
+
+.table caption {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.labelColumn {
+  inline-size: var(--label-width);
+}
+
+.table .pin {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: var(--dp-color-semantic-background-surface);
+  border-inline-end: var(--dp-border-thin) solid var(--dp-color-semantic-border-divider);
+  padding-inline-end: var(--dp-spacing-tiny);
+}
+
+.table thead th {
+  background: var(--dp-color-semantic-background-surface);
+}
+
+.table .group th,
+.table .major > * {
+  background: var(--dp-color-semantic-background-panel);
+}
+
+.group span {
+  position: sticky;
+  inset-inline-start: var(--dp-component-table-cell-padding-inline);
+}
+
+.table .carName {
+  font-size: var(--dp-typography-size-card-title);
+  line-height: var(--dp-typography-line-height-card-title);
+  font-weight: var(--dp-typography-weight-semibold);
+}
+
+.photo {
+  inline-size: 100%;
+  max-inline-size: calc(var(--dp-sizing-listing-thumb) + var(--dp-spacing-panel));
+}
+
+.table .exclude {
+  padding-inline: var(--dp-spacing-tiny);
+}
+
+.muted,
+.metricNote {
+  color: var(--dp-color-semantic-text-secondary);
+  font-weight: var(--dp-typography-weight-regular);
+}
+
+.metricNote {
+  display: block;
+  margin-block-start: var(--dp-spacing-tiny);
+}
+
+@media (max-width: 899px) {
+  .major .majorAmount {
+    font-size: var(--dp-typography-size-section);
+    line-height: var(--dp-typography-line-height-section);
+  }
+}
+
+@media (min-width: 900px) {
+  .scroller {
+    --label-width: calc(var(--dp-layout-comparison-label-min) + var(--dp-spacing-major) * 2);
+  }
+
+  .table {
+    --vehicle-min: calc(var(--dp-layout-comparison-vehicle-min) + var(--dp-spacing-panel) * 2);
+    inline-size: min(
+      100%,
+      calc(var(--label-width) + 2 * var(--comparison-columns) * var(--vehicle-min))
+    );
+  }
+}

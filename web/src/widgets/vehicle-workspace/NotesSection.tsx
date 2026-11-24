@@ -38,7 +38,7 @@ export function NotesSection({ car }: { car: Car }) {
   }
 
   return (
-    <section id="notes" aria-labelledby="notes-title" className={styles.section}>
+    <section id="notes" tabIndex={-1} aria-labelledby="notes-title" className={styles.section}>
       <Stack gap="tight">
         <div className={styles.sectionHeader}>
           <h2 id="notes-title">Заметки об автомобиле</h2>

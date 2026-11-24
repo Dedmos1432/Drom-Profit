@@ -65,7 +65,7 @@ export function MoneyFactorsSection({
   }
 
   return (
-    <section id={group} aria-labelledby={group + '-title'} className={styles.section}>
+    <section id={group} tabIndex={-1} aria-labelledby={group + '-title'} className={styles.section}>
       <Stack gap="tight">
         <div className={styles.sectionHeader}>
           <h2 id={group + '-title'}>{label}</h2>

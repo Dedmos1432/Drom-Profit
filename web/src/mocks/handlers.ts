@@ -1,17 +1,19 @@
 import { http, HttpResponse } from 'msw';
 import listings from '../../../shared/fixtures/import-listings.json';
+import type { Comparison } from '@/entities/comparison/api';
 import type { Car, Listing, Summary } from '@/entities/vehicle/api';
 import { carInputSchema, listingUrlSchema } from '@/entities/vehicle/validation';
 import { apiUrl } from '@/shared/api/client';
 import type { components } from '@/shared/api/schema';
 import type { AppConfig } from '@/shared/config/env';
+import { comparisonRequestSchema, fixtureComparison } from './comparison';
 import { createMockStore } from './store';
 import { fixtureSummary } from './summary';
 import { vehicleWriteHandlers } from './vehicle-writes';
 
 type ContractError = components['schemas']['Error'];
 type Session = components['schemas']['Session'];
-type Payload = ContractError | Car | Car[] | Listing | Session | Summary;
+type Payload = ContractError | Car | Car[] | Listing | Session | Summary | Comparison;
 
 function response(body: Payload, status = 200) {
   return HttpResponse.json<Payload>(body, { status });
@@ -19,6 +21,15 @@ function response(body: Payload, status = 200) {
 
 function error(status: number, code: string, message: string) {
   return response({ code, message }, status);
+}
+
+function calculated(calculate: () => Summary | Comparison) {
+  try {
+    return response(calculate());
+  } catch (reason) {
+    if (!(reason instanceof RangeError)) throw reason;
+    return error(422, 'amount_out_of_range', reason.message);
+  }
 }
 
 const unauthorized = () => error(401, 'unauthorized', 'Сессия недоступна.');
@@ -104,12 +115,22 @@ export function handlers(config: AppConfig, storage: Storage, locks?: LockManage
       if (!session) return unauthorized();
       const car = session.cars.find(({ id }) => id === params.carId);
       if (!car) return missingCar();
-      try {
-        return response(fixtureSummary(car));
-      } catch (reason) {
-        if (!(reason instanceof RangeError)) throw reason;
-        return error(422, 'amount_out_of_range', reason.message);
+      return calculated(() => fixtureSummary(car));
+    }),
+    http.post(url('/api/comparison'), async ({ request }) => {
+      const session = sessionFor(request);
+      if (!session) return unauthorized();
+      const parsed = comparisonRequestSchema.safeParse(await request.json().catch(() => null));
+      if (!parsed.success)
+        return error(422, 'validation_error', 'Выберите хотя бы два разных автомобиля.');
+      const byId = new Map(session.cars.map((car) => [car.id, car]));
+      const cars: Car[] = [];
+      for (const id of parsed.data.car_ids) {
+        const car = byId.get(id);
+        if (!car) return missingCar();
+        cars.push(car);
       }
+      return calculated(() => fixtureComparison(cars));
     }),
     http.get(url('/api/cars/:carId'), ({ params, request }) => {
       const session = sessionFor(request);

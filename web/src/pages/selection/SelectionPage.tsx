@@ -1,8 +1,8 @@
-import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useSession } from '@/entities/session/SessionBoundary';
 import { useCars } from '@/entities/vehicle/api';
 import { ListingLinkForm } from '@/features/import-vehicle/ListingLinkForm';
+import { useComparisonSelection } from '@/features/select-for-comparison/ComparisonSelection';
 import {
   Badge,
   Button,
@@ -30,17 +30,9 @@ export function SelectionPage() {
   const navigate = useNavigate();
   const { config } = useSession();
   const cars = useCars();
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const selectedIds = cars.data?.filter(({ id }) => selected.has(id)).map(({ id }) => id) ?? [];
-
-  function changeSelection(id: string, checked: boolean) {
-    setSelected((previous) => {
-      const next = new Set(previous);
-      if (checked) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-  }
+  const selection = useComparisonSelection();
+  const selected = new Set(selection.ids);
+  const selectedCount = cars.data?.filter(({ id }) => selected.has(id)).length ?? 0;
 
   return (
     <Stack gap="roomy">
@@ -70,15 +62,20 @@ export function SelectionPage() {
           {cars.data && cars.data.length > 0 && (
             <Inline gap="tight">
               <span className={styles.count} role="status">
-                Выбрано {selectedIds.length}
+                Выбрано {selectedCount}
               </span>
               <Button
                 variant="outline"
-                disabled={selectedIds.length < 2}
-                onClick={() => navigate('/comparison', { state: { carIds: selectedIds } })}
+                disabled={selectedCount < 2}
+                onClick={() => navigate('/comparison')}
               >
-                Подготовить сравнение
+                Сравнить автомобили
               </Button>
+              {selection.ids.length > 0 && (
+                <Button variant="ghost" onClick={selection.clear}>
+                  Очистить выбор
+                </Button>
+              )}
             </Inline>
           )}
         </div>
@@ -104,17 +101,17 @@ export function SelectionPage() {
         )}
         {cars.data && cars.data.length > 0 && (
           <>
-            <p className={styles.count}>
-              Выберите хотя бы два автомобиля. Таблица сравнения появится на следующем этапе.
-            </p>
+            {selectedCount < 2 && (
+              <p className={styles.count}>Выберите хотя бы два автомобиля для сравнения.</p>
+            )}
             <ul className={styles.items}>
               {cars.data.map((car) => (
                 <li key={car.id}>
                   <VehicleCard
                     car={car}
                     selected={selected.has(car.id)}
-                    onSelection={changeSelection}
-                    onRemoved={(id) => changeSelection(id, false)}
+                    onSelection={selection.select}
+                    onRemoved={(id) => selection.select(id, false)}
                   />
                 </li>
               ))}

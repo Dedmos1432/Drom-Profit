@@ -3,6 +3,10 @@
   font-weight: var(--dp-typography-weight-bold);
 }
 
+.wrapGroups {
+  overflow-wrap: normal;
+}
+
 .compact {
   font-size: var(--dp-typography-size-compact);
   line-height: var(--dp-typography-line-height-compact);
@@ -46,6 +50,11 @@
   max-inline-size: 100%;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
+}
+
+.scrollHint {
+  color: var(--dp-color-semantic-text-secondary);
+  font-size: var(--dp-typography-size-compact);
 }
 
 .table {

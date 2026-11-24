@@ -1,5 +1,5 @@
 import { ImageOff } from 'lucide-react';
-import { cloneElement, useEffect, useId, useRef, useState } from 'react';
+import { cloneElement, Fragment, useEffect, useId, useRef, useState } from 'react';
 import type { AriaAttributes, ComponentPropsWithRef, ReactElement, ReactNode } from 'react';
 import { classes } from '@/shared/lib/classes';
 import styles from './Data.module.css';
@@ -14,12 +14,27 @@ type PriceProps = Omit<ComponentPropsWithRef<'span'>, 'children'> & {
   value: number | null;
   size?: 'compact' | 'regular' | 'display';
   unknownLabel?: string;
+  wrapGroups?: boolean;
 };
+
+function moneyWithBreaks(value: number) {
+  return rubles.formatToParts(value).map((part, index) =>
+    part.type === 'group' ? (
+      <Fragment key={index}>
+        {part.value}
+        <wbr />
+      </Fragment>
+    ) : (
+      part.value
+    ),
+  );
+}
 
 export function Price({
   value,
   size = 'regular',
   unknownLabel = 'Не указано',
+  wrapGroups = false,
   className,
   ...props
 }: PriceProps) {
@@ -27,9 +42,15 @@ export function Price({
   return (
     <span
       {...props}
-      className={classes(styles.price, styles[size], !known && styles.unknown, className)}
+      className={classes(
+        styles.price,
+        styles[size],
+        wrapGroups && styles.wrapGroups,
+        !known && styles.unknown,
+        className,
+      )}
     >
-      {known ? rubles.format(value) : unknownLabel}
+      {known ? (wrapGroups ? moneyWithBreaks(value) : rubles.format(value)) : unknownLabel}
     </span>
   );
 }
@@ -53,10 +74,24 @@ export function SpecificationList({
   );
 }
 
-type TableProps = ComponentPropsWithRef<'table'> & { caption: string; wide?: boolean };
+type TableProps = ComponentPropsWithRef<'table'> & {
+  caption: string;
+  wide?: boolean;
+  scrollHint?: string;
+  scrollClassName?: string;
+};
 
-export function Table({ caption, children, wide = false, className, ...props }: TableProps) {
+export function Table({
+  caption,
+  children,
+  wide = false,
+  className,
+  scrollHint,
+  scrollClassName,
+  ...props
+}: TableProps) {
   const captionId = useId();
+  const hintId = useId();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [overflowing, setOverflowing] = useState(false);
 
@@ -78,18 +113,26 @@ export function Table({ caption, children, wide = false, className, ...props }: 
   }, []);
 
   return (
-    <div
-      ref={scrollRef}
-      className={styles.tableScroll}
-      role={overflowing ? 'region' : undefined}
-      aria-labelledby={overflowing ? captionId : undefined}
-      tabIndex={overflowing ? 0 : undefined}
-    >
-      <table {...props} className={classes(styles.table, wide && styles.wide, className)}>
-        <caption id={captionId}>{caption}</caption>
-        {children}
-      </table>
-    </div>
+    <>
+      {overflowing && scrollHint && (
+        <p id={hintId} className={styles.scrollHint}>
+          {scrollHint}
+        </p>
+      )}
+      <div
+        ref={scrollRef}
+        className={classes(styles.tableScroll, scrollClassName)}
+        role={overflowing ? 'region' : undefined}
+        aria-labelledby={overflowing ? captionId : undefined}
+        aria-describedby={overflowing && scrollHint ? hintId : undefined}
+        tabIndex={overflowing ? 0 : undefined}
+      >
+        <table {...props} className={classes(styles.table, wide && styles.wide, className)}>
+          <caption id={captionId}>{caption}</caption>
+          {children}
+        </table>
+      </div>
+    </>
   );
 }
 

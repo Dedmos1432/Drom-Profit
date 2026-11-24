@@ -16,6 +16,7 @@ const sessionSchema = z.object({
 const SessionContext = createContext<{
   api: ReturnType<typeof createApiClient>;
   config: AppConfig;
+  selectionKey: string;
 } | null>(null);
 
 export function useSession() {
@@ -45,7 +46,7 @@ export function SessionBoundary({ config }: { config: AppConfig }) {
     );
   }, [baseUrl, storageKey]);
   const session = useQuery({ queryKey, queryFn: store.load, staleTime: Infinity, retry: false });
-  const token = session.data;
+  const token = session.data?.token;
   const api = useMemo(
     () =>
       createApiClient({
@@ -112,7 +113,7 @@ export function SessionBoundary({ config }: { config: AppConfig }) {
     );
 
   return (
-    <SessionContext.Provider value={{ api, config }}>
+    <SessionContext.Provider value={{ api, config, selectionKey: session.data.selectionKey }}>
       <Outlet />
     </SessionContext.Provider>
   );

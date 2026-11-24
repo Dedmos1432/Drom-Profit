@@ -17,21 +17,35 @@ export function createSessionStore(
   issue: () => Promise<string>,
   locks?: LockManager,
 ) {
-  let pending: Promise<string> | undefined;
+  const scopeKey = key + '.scope';
+  const selectionKey = (scope: string) => key + '.comparison.' + scope;
 
-  async function restoreOrCreate() {
+  function clearScope() {
+    const scope = storage.getItem(scopeKey);
+    if (scope) storage.removeItem(selectionKey(scope));
+    storage.removeItem(scopeKey);
+  }
+
+  async function load() {
     const saved = storage.getItem(key);
-    if (saved) return saved;
-
-    const token = await issue();
-    storage.setItem(key, token);
-    return token;
+    const token = saved || (await issue());
+    if (!saved) {
+      clearScope();
+      storage.setItem(key, token);
+    }
+    let scope = storage.getItem(scopeKey);
+    if (!scope) {
+      scope = crypto.getRandomValues(new Uint32Array(4)).join('-');
+      storage.setItem(scopeKey, scope);
+    }
+    return { token, selectionKey: selectionKey(scope) };
   }
 
   async function loadExclusive() {
-    return locks ? await locks.request(key, restoreOrCreate) : await restoreOrCreate();
+    return locks ? await locks.request(key, load) : await load();
   }
 
+  let pending: ReturnType<typeof load> | undefined;
   return {
     load() {
       pending ??= loadExclusive().finally(() => {
@@ -41,6 +55,7 @@ export function createSessionStore(
     },
     clear() {
       storage.removeItem(key);
+      clearScope();
     },
   };
 }

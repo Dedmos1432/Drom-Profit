@@ -20,12 +20,17 @@ describe('anonymous session', () => {
     const key = sessionStorageKey(config);
     const store = createSessionStore(storage, key, issue);
 
-    expect(await Promise.all([store.load(), store.load()])).toEqual([
-      'fixture-token',
-      'fixture-token',
-    ]);
-    expect(await createSessionStore(storage, key, issue).load()).toBe('fixture-token');
+    const [first, second] = await Promise.all([store.load(), store.load()]);
+    expect(first.token).toBe('fixture-token');
+    expect(first).toEqual(second);
+    storage.setItem(first.selectionKey, '["a", "b"]');
+    expect(await createSessionStore(storage, key, issue).load()).toEqual(first);
     expect(issue).toHaveBeenCalledOnce();
+
+    store.clear();
+    const replacement = await store.load();
+    expect(replacement.selectionKey).not.toBe(first.selectionKey);
+    expect(storage.getItem(first.selectionKey)).toBeNull();
   });
 
   it('isolates mock, real and seeded sessions', () => {
