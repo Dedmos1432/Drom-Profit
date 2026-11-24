@@ -1,0 +1,123 @@
+[
+  {
+    "source": "demo",
+    "listing_id": "demo-001",
+    "brand": "Toyota",
+    "model": "Camry",
+    "year": 2015,
+    "price": 1200000,
+    "mileage_km": 145000,
+    "trim": null,
+    "fuel_type": "Бензин",
+    "engine_volume_l": 2.5,
+    "power_hp": null,
+    "transmission": "Автомат",
+    "drive_type": "Передний",
+    "city": "Владивосток",
+    "image_url": null,
+    "listing_url": "https://auto.drom.ru/demo/1.html",
+    "market_valuation": null,
+    "fetched_at": null,
+    "id": "car-1",
+    "expenses_reviewed": true,
+    "benefits_reviewed": true,
+    "expenses": [
+      {
+        "id": "exp-1",
+        "title": "Предполагаемый ремонт",
+        "kind": "repair",
+        "amount": 140000,
+        "factor_key": null,
+        "comment": null
+      }
+    ],
+    "benefits": [],
+    "notes": []
+  },
+  {
+    "source": "demo",
+    "listing_id": "demo-002",
+    "brand": "Toyota",
+    "model": "Camry",
+    "year": 2015,
+    "price": 1270000,
+    "mileage_km": 130000,
+    "trim": null,
+    "fuel_type": "Бензин",
+    "engine_volume_l": 2.5,
+    "power_hp": null,
+    "transmission": "Автомат",
+    "drive_type": "Передний",
+    "city": "Владивосток",
+    "image_url": null,
+    "listing_url": "https://auto.drom.ru/demo/2.html",
+    "market_valuation": null,
+    "fetched_at": null,
+    "id": "car-2",
+    "expenses_reviewed": true,
+    "benefits_reviewed": true,
+    "expenses": [
+      {
+        "id": "exp-2",
+        "title": "Предполагаемый ремонт",
+        "kind": "repair",
+        "amount": 30000,
+        "factor_key": null,
+        "comment": null
+      }
+    ],
+    "benefits": [
+      {
+        "id": "ben-2",
+        "title": "Зимняя резина",
+        "amount": 50000,
+        "factor_key": "winter_tires",
+        "comment": null
+      }
+    ],
+    "notes": []
+  },
+  {
+    "source": "demo",
+    "listing_id": "demo-003",
+    "brand": "Toyota",
+    "model": "Camry",
+    "year": 2015,
+    "price": 1320000,
+    "mileage_km": 120000,
+    "trim": null,
+    "fuel_type": "Бензин",
+    "engine_volume_l": 2.5,
+    "power_hp": null,
+    "transmission": "Автомат",
+    "drive_type": "Передний",
+    "city": "Владивосток",
+    "image_url": null,
+    "listing_url": "https://auto.drom.ru/demo/3.html",
+    "market_valuation": null,
+    "fetched_at": null,
+    "id": "car-3",
+    "expenses_reviewed": true,
+    "benefits_reviewed": true,
+    "expenses": [
+      {
+        "id": "exp-3",
+        "title": "Предполагаемый ремонт",
+        "kind": "repair",
+        "amount": 15000,
+        "factor_key": null,
+        "comment": null
+      }
+    ],
+    "benefits": [
+      {
+        "id": "ben-3",
+        "title": "Дополнительное оснащение",
+        "amount": 20000,
+        "factor_key": null,
+        "comment": null
+      }
+    ],
+    "notes": []
+  }
+]

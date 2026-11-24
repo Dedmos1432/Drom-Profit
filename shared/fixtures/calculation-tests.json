@@ -1,0 +1,466 @@
+[
+  {
+    "name": "basic",
+    "cars": [
+      {
+        "source": "demo",
+        "listing_id": "demo-001",
+        "brand": "Toyota",
+        "model": "Camry",
+        "year": 2015,
+        "price": 1200000,
+        "mileage_km": 145000,
+        "trim": null,
+        "fuel_type": "Бензин",
+        "engine_volume_l": 2.5,
+        "power_hp": null,
+        "transmission": "Автомат",
+        "drive_type": "Передний",
+        "city": "Владивосток",
+        "image_url": null,
+        "listing_url": "https://auto.drom.ru/demo/1.html",
+        "market_valuation": null,
+        "fetched_at": null,
+        "id": "car-1",
+        "expenses_reviewed": true,
+        "benefits_reviewed": true,
+        "expenses": [
+          {
+            "id": "exp-1",
+            "title": "Предполагаемый ремонт",
+            "kind": "repair",
+            "amount": 140000,
+            "factor_key": null,
+            "comment": null
+          }
+        ],
+        "benefits": [],
+        "notes": []
+      },
+      {
+        "source": "demo",
+        "listing_id": "demo-002",
+        "brand": "Toyota",
+        "model": "Camry",
+        "year": 2015,
+        "price": 1270000,
+        "mileage_km": 130000,
+        "trim": null,
+        "fuel_type": "Бензин",
+        "engine_volume_l": 2.5,
+        "power_hp": null,
+        "transmission": "Автомат",
+        "drive_type": "Передний",
+        "city": "Владивосток",
+        "image_url": null,
+        "listing_url": "https://auto.drom.ru/demo/2.html",
+        "market_valuation": null,
+        "fetched_at": null,
+        "id": "car-2",
+        "expenses_reviewed": true,
+        "benefits_reviewed": true,
+        "expenses": [
+          {
+            "id": "exp-2",
+            "title": "Предполагаемый ремонт",
+            "kind": "repair",
+            "amount": 30000,
+            "factor_key": null,
+            "comment": null
+          }
+        ],
+        "benefits": [
+          {
+            "id": "ben-2",
+            "title": "Зимняя резина",
+            "amount": 50000,
+            "factor_key": "winter_tires",
+            "comment": null
+          }
+        ],
+        "notes": []
+      },
+      {
+        "source": "demo",
+        "listing_id": "demo-003",
+        "brand": "Toyota",
+        "model": "Camry",
+        "year": 2015,
+        "price": 1320000,
+        "mileage_km": 120000,
+        "trim": null,
+        "fuel_type": "Бензин",
+        "engine_volume_l": 2.5,
+        "power_hp": null,
+        "transmission": "Автомат",
+        "drive_type": "Передний",
+        "city": "Владивосток",
+        "image_url": null,
+        "listing_url": "https://auto.drom.ru/demo/3.html",
+        "market_valuation": null,
+        "fetched_at": null,
+        "id": "car-3",
+        "expenses_reviewed": true,
+        "benefits_reviewed": true,
+        "expenses": [
+          {
+            "id": "exp-3",
+            "title": "Предполагаемый ремонт",
+            "kind": "repair",
+            "amount": 15000,
+            "factor_key": null,
+            "comment": null
+          }
+        ],
+        "benefits": [
+          {
+            "id": "ben-3",
+            "title": "Дополнительное оснащение",
+            "amount": 20000,
+            "factor_key": null,
+            "comment": null
+          }
+        ],
+        "notes": []
+      }
+    ],
+    "expected": {
+      "items": [
+        {
+          "car_id": "car-1",
+          "listing_price": 1200000,
+          "total_expenses": 140000,
+          "total_benefits": 0,
+          "acquisition_cost": 1340000,
+          "adjusted_cost": 1340000,
+          "assessment_status": "complete",
+          "unknown_expenses": 0,
+          "unknown_benefits": 0,
+          "difference_from_min": 90000
+        },
+        {
+          "car_id": "car-2",
+          "listing_price": 1270000,
+          "total_expenses": 30000,
+          "total_benefits": 50000,
+          "acquisition_cost": 1300000,
+          "adjusted_cost": 1250000,
+          "assessment_status": "complete",
+          "unknown_expenses": 0,
+          "unknown_benefits": 0,
+          "difference_from_min": 0
+        },
+        {
+          "car_id": "car-3",
+          "listing_price": 1320000,
+          "total_expenses": 15000,
+          "total_benefits": 20000,
+          "acquisition_cost": 1335000,
+          "adjusted_cost": 1315000,
+          "assessment_status": "complete",
+          "unknown_expenses": 0,
+          "unknown_benefits": 0,
+          "difference_from_min": 65000
+        }
+      ],
+      "warning_codes": [],
+      "provisional": false
+    }
+  },
+  {
+    "name": "unknown",
+    "cars": [
+      {
+        "id": "a",
+        "price": 100000,
+        "expenses_reviewed": true,
+        "benefits_reviewed": true,
+        "expenses": [
+          {
+            "kind": "repair",
+            "amount": null,
+            "factor_key": null
+          },
+          {
+            "kind": "repair",
+            "amount": 10000,
+            "factor_key": null
+          }
+        ],
+        "benefits": []
+      },
+      {
+        "id": "b",
+        "price": 120000,
+        "expenses_reviewed": true,
+        "benefits_reviewed": true,
+        "expenses": [],
+        "benefits": []
+      }
+    ],
+    "expected": {
+      "items": [
+        {
+          "car_id": "a",
+          "listing_price": 100000,
+          "total_expenses": 10000,
+          "total_benefits": 0,
+          "acquisition_cost": 110000,
+          "adjusted_cost": 110000,
+          "assessment_status": "incomplete",
+          "unknown_expenses": 1,
+          "unknown_benefits": 0,
+          "difference_from_min": 0
+        },
+        {
+          "car_id": "b",
+          "listing_price": 120000,
+          "total_expenses": 0,
+          "total_benefits": 0,
+          "acquisition_cost": 120000,
+          "adjusted_cost": 120000,
+          "assessment_status": "complete",
+          "unknown_expenses": 0,
+          "unknown_benefits": 0,
+          "difference_from_min": 10000
+        }
+      ],
+      "warning_codes": [
+        "incomplete"
+      ],
+      "provisional": true
+    }
+  },
+  {
+    "name": "empty_unreviewed",
+    "cars": [
+      {
+        "id": "a",
+        "price": 100000,
+        "expenses_reviewed": false,
+        "benefits_reviewed": false,
+        "expenses": [],
+        "benefits": []
+      },
+      {
+        "id": "b",
+        "price": 100000,
+        "expenses_reviewed": true,
+        "benefits_reviewed": true,
+        "expenses": [],
+        "benefits": []
+      }
+    ],
+    "expected": {
+      "items": [
+        {
+          "car_id": "a",
+          "listing_price": 100000,
+          "total_expenses": 0,
+          "total_benefits": 0,
+          "acquisition_cost": 100000,
+          "adjusted_cost": 100000,
+          "assessment_status": "incomplete",
+          "unknown_expenses": 0,
+          "unknown_benefits": 0,
+          "difference_from_min": 0
+        },
+        {
+          "car_id": "b",
+          "listing_price": 100000,
+          "total_expenses": 0,
+          "total_benefits": 0,
+          "acquisition_cost": 100000,
+          "adjusted_cost": 100000,
+          "assessment_status": "complete",
+          "unknown_expenses": 0,
+          "unknown_benefits": 0,
+          "difference_from_min": 0
+        }
+      ],
+      "warning_codes": [
+        "incomplete"
+      ],
+      "provisional": true
+    }
+  },
+  {
+    "name": "tie",
+    "cars": [
+      {
+        "id": "a",
+        "price": 100000,
+        "expenses_reviewed": true,
+        "benefits_reviewed": true,
+        "expenses": [
+          {
+            "kind": "repair",
+            "amount": 10000,
+            "factor_key": null
+          }
+        ],
+        "benefits": []
+      },
+      {
+        "id": "b",
+        "price": 110000,
+        "expenses_reviewed": true,
+        "benefits_reviewed": true,
+        "expenses": [],
+        "benefits": []
+      }
+    ],
+    "expected": {
+      "items": [
+        {
+          "car_id": "a",
+          "listing_price": 100000,
+          "total_expenses": 10000,
+          "total_benefits": 0,
+          "acquisition_cost": 110000,
+          "adjusted_cost": 110000,
+          "assessment_status": "complete",
+          "unknown_expenses": 0,
+          "unknown_benefits": 0,
+          "difference_from_min": 0
+        },
+        {
+          "car_id": "b",
+          "listing_price": 110000,
+          "total_expenses": 0,
+          "total_benefits": 0,
+          "acquisition_cost": 110000,
+          "adjusted_cost": 110000,
+          "assessment_status": "complete",
+          "unknown_expenses": 0,
+          "unknown_benefits": 0,
+          "difference_from_min": 0
+        }
+      ],
+      "warning_codes": [],
+      "provisional": false
+    }
+  },
+  {
+    "name": "negative",
+    "cars": [
+      {
+        "id": "a",
+        "price": 100000,
+        "expenses_reviewed": true,
+        "benefits_reviewed": true,
+        "expenses": [],
+        "benefits": [
+          {
+            "amount": 120000,
+            "factor_key": null
+          }
+        ]
+      },
+      {
+        "id": "b",
+        "price": 110000,
+        "expenses_reviewed": true,
+        "benefits_reviewed": true,
+        "expenses": [],
+        "benefits": []
+      }
+    ],
+    "expected": {
+      "items": [
+        {
+          "car_id": "a",
+          "listing_price": 100000,
+          "total_expenses": 0,
+          "total_benefits": 120000,
+          "acquisition_cost": 100000,
+          "adjusted_cost": -20000,
+          "assessment_status": "complete",
+          "unknown_expenses": 0,
+          "unknown_benefits": 0,
+          "difference_from_min": 0
+        },
+        {
+          "car_id": "b",
+          "listing_price": 110000,
+          "total_expenses": 0,
+          "total_benefits": 0,
+          "acquisition_cost": 110000,
+          "adjusted_cost": 110000,
+          "assessment_status": "complete",
+          "unknown_expenses": 0,
+          "unknown_benefits": 0,
+          "difference_from_min": 130000
+        }
+      ],
+      "warning_codes": [
+        "negative_adjusted_cost"
+      ],
+      "provisional": true
+    }
+  },
+  {
+    "name": "double_count",
+    "cars": [
+      {
+        "id": "a",
+        "price": 100000,
+        "expenses_reviewed": true,
+        "benefits_reviewed": true,
+        "expenses": [
+          {
+            "kind": "missing_equipment",
+            "amount": 20000,
+            "factor_key": "winter_tires"
+          }
+        ],
+        "benefits": []
+      },
+      {
+        "id": "b",
+        "price": 120000,
+        "expenses_reviewed": true,
+        "benefits_reviewed": true,
+        "expenses": [],
+        "benefits": [
+          {
+            "amount": 20000,
+            "factor_key": "winter_tires"
+          }
+        ]
+      }
+    ],
+    "expected": {
+      "items": [
+        {
+          "car_id": "a",
+          "listing_price": 100000,
+          "total_expenses": 20000,
+          "total_benefits": 0,
+          "acquisition_cost": 120000,
+          "adjusted_cost": 120000,
+          "assessment_status": "complete",
+          "unknown_expenses": 0,
+          "unknown_benefits": 0,
+          "difference_from_min": null
+        },
+        {
+          "car_id": "b",
+          "listing_price": 120000,
+          "total_expenses": 0,
+          "total_benefits": 20000,
+          "acquisition_cost": 120000,
+          "adjusted_cost": 100000,
+          "assessment_status": "complete",
+          "unknown_expenses": 0,
+          "unknown_benefits": 0,
+          "difference_from_min": null
+        }
+      ],
+      "warning_codes": [
+        "double_count"
+      ],
+      "provisional": true
+    }
+  }
+]
