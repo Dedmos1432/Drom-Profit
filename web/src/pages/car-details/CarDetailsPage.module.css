@@ -4,6 +4,12 @@
   gap: var(--dp-spacing-roomy);
 }
 
+.workspace {
+  display: grid;
+  align-items: start;
+  gap: var(--dp-spacing-roomy);
+}
+
 .description {
   min-inline-size: 0;
 }
@@ -24,6 +30,11 @@
 @media (min-width: 900px) {
   .details {
     grid-template-columns: var(--dp-layout-detail-columns);
+    gap: var(--dp-spacing-major);
+  }
+
+  .workspace {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
     gap: var(--dp-spacing-major);
   }
 }

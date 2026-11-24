@@ -1,5 +1,7 @@
 import { Link as RouterLink, useParams } from 'react-router';
-import { useCar } from '@/entities/vehicle/api';
+import { useState } from 'react';
+import { useCar, useCarSummary } from '@/entities/vehicle/api';
+import type { Car } from '@/entities/vehicle/api';
 import {
   engine,
   mileage,
@@ -8,6 +10,7 @@ import {
   vehicleSourceLabel,
 } from '@/entities/vehicle/presentation';
 import { VehiclePhoto } from '@/entities/vehicle/VehiclePhoto';
+import { EditVehicleDialog } from '@/features/edit-vehicle/EditVehicleDialog';
 import { ApiError } from '@/shared/api/client';
 import {
   Badge,
@@ -15,6 +18,7 @@ import {
   Button,
   EmptyState,
   ErrorState,
+  Inline,
   Link,
   PageHeader,
   Price,
@@ -22,6 +26,9 @@ import {
   Spinner,
   Stack,
 } from '@/shared/ui';
+import { FinancialSummary } from '@/widgets/vehicle-workspace/FinancialSummary';
+import { MoneyFactorsSection } from '@/widgets/vehicle-workspace/MoneyFactorsSection';
+import { NotesSection } from '@/widgets/vehicle-workspace/NotesSection';
 import styles from './CarDetailsPage.module.css';
 
 export function CarDetailsPage() {
@@ -60,7 +67,30 @@ export function CarDetailsPage() {
       </Stack>
     );
 
-  const car = query.data;
+  return (
+    <VehicleDetails
+      key={query.data.id}
+      car={query.data}
+      reviewAvailable={!query.isFetching && !query.isError}
+      failed={query.isError}
+      retry={() => void query.refetch()}
+    />
+  );
+}
+
+function VehicleDetails({
+  car,
+  reviewAvailable,
+  failed,
+  retry,
+}: {
+  car: Car;
+  reviewAvailable: boolean;
+  failed: boolean;
+  retry: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const summary = useCarSummary(car.id);
   const name = vehicleName(car);
   const original = originalListing(car);
 
@@ -72,6 +102,17 @@ export function CarDetailsPage() {
           { label: name },
         ]}
       />
+      {failed && (
+        <ErrorState
+          title="Не удалось обновить карточку"
+          description="Показаны последние загруженные характеристики."
+          action={
+            <Button variant="secondary" onClick={retry}>
+              Повторить загрузку карточки
+            </Button>
+          }
+        />
+      )}
       <div className={styles.details}>
         <VehiclePhoto value={car.image_url} />
         <Stack className={styles.description} gap="roomy">
@@ -112,9 +153,38 @@ export function CarDetailsPage() {
               </Link>
             </div>
           )}
-          <div>{back}</div>
+          <Inline gap="tight">
+            <Button variant="outline" onClick={() => setEditing(true)}>
+              Редактировать характеристики
+            </Button>
+            <Link href="#financial-summary">К саммари</Link>
+          </Inline>
         </Stack>
       </div>
+      <div className={styles.workspace}>
+        <Stack gap="roomy">
+          <MoneyFactorsSection
+            car={car}
+            group="expenses"
+            summary={summary.current}
+            summaryUpdating={summary.updating}
+            reviewAvailable={reviewAvailable}
+          />
+          <MoneyFactorsSection
+            car={car}
+            group="benefits"
+            summary={summary.current}
+            summaryUpdating={summary.updating}
+            reviewAvailable={reviewAvailable}
+          />
+          <NotesSection car={car} />
+        </Stack>
+        <FinancialSummary car={car} summary={summary} reviewAvailable={reviewAvailable} />
+      </div>
+      <div>
+        <RouterLink to="/">Вернуться в выборку</RouterLink>
+      </div>
+      {editing && <EditVehicleDialog car={car} onClose={() => setEditing(false)} />}
     </Stack>
   );
 }

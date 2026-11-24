@@ -2,10 +2,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import type { HTMLAttributes } from 'react';
 import { useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import type { CarInput, Listing } from '@/entities/vehicle/api';
+import type { Car, CarInput, CarPatch, Listing } from '@/entities/vehicle/api';
 import { carFormSchema } from '@/entities/vehicle/validation';
 import type { CarFormValues, ValidCarForm } from '@/entities/vehicle/validation';
-import { Alert, Button, Input, Stack } from '@/shared/ui';
+import { changedFields } from '@/shared/lib/changed-fields';
+import { Alert, Button, Inline, Input, Stack } from '@/shared/ui';
 import styles from './VehicleForm.module.css';
 
 type Field = {
@@ -48,23 +49,23 @@ const source: Field[] = [
 
 const allFields = [...basics, ...specifications, ...source];
 
-function initialValues(listing?: Listing): CarFormValues {
+function initialValues(listing?: Listing | Car): CarFormValues {
   return Object.fromEntries(
     allFields.map(({ name }) => [name, String(listing?.[name] ?? '')]),
   ) as CarFormValues;
 }
 
-export function VehicleForm({
-  listing,
-  onSave,
-  saving,
-  failed,
-}: {
-  listing?: Listing;
-  onSave: (input: CarInput) => Promise<void>;
+type VehicleFormProps = {
   saving?: boolean;
   failed?: boolean;
-}) {
+} & (
+  | { car?: never; listing?: Listing; onSave: (input: CarInput) => Promise<void> }
+  | { car: Car; listing?: never; onSave: (patch: CarPatch) => Promise<void>; onCancel: () => void }
+);
+
+export function VehicleForm(props: VehicleFormProps) {
+  const { car, listing, saving, failed } = props;
+  const baseline = useRef(car).current;
   const locked = useRef(false);
   const {
     handleSubmit,
@@ -72,7 +73,7 @@ export function VehicleForm({
     formState: { errors },
   } = useForm<CarFormValues, unknown, ValidCarForm>({
     resolver: zodResolver(carFormSchema),
-    defaultValues: initialValues(listing),
+    defaultValues: initialValues(car ?? listing),
   });
 
   function group(title: string, fields: Field[]) {
@@ -95,12 +96,16 @@ export function VehicleForm({
         if (locked.current) return;
         locked.current = true;
         try {
-          await onSave({
-            ...values,
-            source: listing?.source ?? 'manual',
-            listing_id: listing?.listing_id ?? null,
-            fetched_at: listing?.fetched_at ?? null,
-          });
+          if (props.car) {
+            await props.onSave(changedFields(baseline ?? props.car, values));
+          } else {
+            await props.onSave({
+              ...values,
+              source: listing?.source ?? 'manual',
+              listing_id: listing?.listing_id ?? null,
+              fetched_at: listing?.fetched_at ?? null,
+            });
+          }
         } finally {
           locked.current = false;
         }
@@ -116,11 +121,16 @@ export function VehicleForm({
             Введённые данные сохранены в форме. Повторите попытку.
           </Alert>
         )}
-        <div>
+        <Inline gap="tight">
           <Button type="submit" loading={saving}>
-            {saving ? 'Сохраняем…' : 'Сохранить автомобиль'}
+            {saving ? 'Сохраняем…' : car ? 'Сохранить изменения' : 'Сохранить автомобиль'}
           </Button>
-        </div>
+          {props.car && (
+            <Button type="button" variant="secondary" disabled={saving} onClick={props.onCancel}>
+              Отмена
+            </Button>
+          )}
+        </Inline>
       </Stack>
     </form>
   );

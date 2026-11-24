@@ -43,6 +43,24 @@
   gap: var(--dp-spacing-hairline) var(--dp-spacing-tiny);
 }
 
+.metrics {
+  justify-self: stretch;
+  justify-items: stretch;
+  margin: 0;
+}
+
+.calculated {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--dp-spacing-tiny);
+}
+
+.calculated dd {
+  margin: 0;
+  text-align: end;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

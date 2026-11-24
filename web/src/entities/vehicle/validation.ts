@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { CarInput } from './api';
+import type { CarInput, CarPatch } from './api';
 
 const brand = z.string().trim().min(1, 'Укажите марку.');
 const model = z.string().trim().min(1, 'Укажите модель.');
@@ -53,6 +53,11 @@ export const carInputSchema = z.strictObject({
   listing_url: uri.nullable().optional(),
   market_valuation: nonnegativeInteger.nullable().optional(),
 }) satisfies z.ZodType<CarInput>;
+
+export const carPatchSchema = carInputSchema
+  .omit({ source: true, listing_id: true, fetched_at: true })
+  .extend({ expenses_reviewed: z.boolean(), benefits_reviewed: z.boolean() })
+  .partial() satisfies z.ZodType<CarPatch>;
 
 const optionalText = z
   .string()

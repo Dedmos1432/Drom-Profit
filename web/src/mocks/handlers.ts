@@ -7,6 +7,7 @@ import type { components } from '@/shared/api/schema';
 import type { AppConfig } from '@/shared/config/env';
 import { createMockStore } from './store';
 import { fixtureSummary } from './summary';
+import { vehicleWriteHandlers } from './vehicle-writes';
 
 type ContractError = components['schemas']['Error'];
 type Session = components['schemas']['Session'];
@@ -47,6 +48,13 @@ export function handlers(config: AppConfig, storage: Storage, locks?: LockManage
     const token = request.headers.get('Authorization')?.match(/^Bearer (drom-demo-[\w-]+)$/i)?.[1];
     const cars = token ? store.list(token) : null;
     return token && cars ? { token, cars } : null;
+  }
+
+  async function mutateCar(request: Request, id: string, apply: (car: Car) => Response) {
+    const session = sessionFor(request);
+    if (!session) return unauthorized();
+    const result = await store.mutateCar(session.token, id, apply);
+    return result === null ? unauthorized() : (result ?? missingCar());
   }
 
   return [
@@ -95,7 +103,13 @@ export function handlers(config: AppConfig, storage: Storage, locks?: LockManage
       const session = sessionFor(request);
       if (!session) return unauthorized();
       const car = session.cars.find(({ id }) => id === params.carId);
-      return car ? response(fixtureSummary(car)) : missingCar();
+      if (!car) return missingCar();
+      try {
+        return response(fixtureSummary(car));
+      } catch (reason) {
+        if (!(reason instanceof RangeError)) throw reason;
+        return error(422, 'amount_out_of_range', reason.message);
+      }
     }),
     http.get(url('/api/cars/:carId'), ({ params, request }) => {
       const session = sessionFor(request);
@@ -103,6 +117,7 @@ export function handlers(config: AppConfig, storage: Storage, locks?: LockManage
       const car = session.cars.find(({ id }) => id === params.carId);
       return car ? response(car) : missingCar();
     }),
+    ...vehicleWriteHandlers(url, mutateCar),
     http.delete(url('/api/cars/:carId'), async ({ params, request }) => {
       const session = sessionFor(request);
       if (!session) return unauthorized();

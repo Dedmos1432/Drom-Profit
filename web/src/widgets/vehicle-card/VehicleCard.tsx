@@ -10,7 +10,7 @@ import {
 } from '@/entities/vehicle/presentation';
 import { VehiclePhoto } from '@/entities/vehicle/VehiclePhoto';
 import { DeleteVehicleButton } from '@/features/delete-vehicle/DeleteVehicleButton';
-import { Badge, Checkbox, Inline, Link, Price } from '@/shared/ui';
+import { Badge, Button, Checkbox, Inline, Link, Price } from '@/shared/ui';
 import styles from './VehicleCard.module.css';
 
 type Props = {
@@ -27,7 +27,7 @@ export function VehicleCard({ car, selected, onSelection, onRemoved }: Props) {
     .filter(Boolean)
     .join(' · ');
   const original = originalListing(car);
-  const complete = summary.data?.assessment_status === 'complete';
+  const complete = summary.current?.assessment_status === 'complete';
 
   return (
     <article className={styles.card} aria-label={name}>
@@ -53,26 +53,37 @@ export function VehicleCard({ car, selected, onSelection, onRemoved }: Props) {
             Рыночная оценка Дрома <Price size="compact" value={car.market_valuation} />
           </p>
         )}
-        {summary.data ? (
+        {summary.current ? (
           <>
             <Badge tone={complete ? 'success' : 'warning'}>
               {complete ? 'Оценка полная' : 'Оценка предварительная'}
             </Badge>
-            <div className={styles.metrics}>
-              <p className={styles.metric}>
-                Предполагаемые затраты{' '}
-                <Price size="compact" value={summary.data.acquisition_cost} />
-              </p>
-              <p className={styles.metric}>
-                Скорректированная стоимость{' '}
-                <Price size="compact" value={summary.data.adjusted_cost} />
-              </p>
-            </div>
+            <dl className={styles.metrics}>
+              <div className={styles.calculated}>
+                <dt>Затраты на приобретение</dt>
+                <dd>
+                  <Price size="compact" value={summary.current.acquisition_cost} />
+                </dd>
+              </div>
+              <div className={styles.calculated}>
+                <dt>Скорректированная стоимость</dt>
+                <dd>
+                  <Price size="compact" value={summary.current.adjusted_cost} />
+                </dd>
+              </div>
+            </dl>
           </>
-        ) : (
-          <p className={styles.muted}>
-            {summary.isPending ? 'Загружаем оценку…' : 'Оценка недоступна'}
+        ) : summary.updating ? (
+          <p className={styles.muted} role="status">
+            Обновляем оценку…
           </p>
+        ) : (
+          <Inline gap="tight">
+            <p className={styles.muted}>Оценка недоступна</p>
+            <Button variant="ghost" onClick={() => void summary.retry()}>
+              Повторить
+            </Button>
+          </Inline>
         )}
       </div>
       <div className={styles.actions}>

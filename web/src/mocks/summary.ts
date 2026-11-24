@@ -1,7 +1,12 @@
 import type { Car, Summary } from '@/entities/vehicle/api';
 
-export function fixtureSummary(car: Car): Summary {
-  function summarize(items: { amount: number | null }[]) {
+type SummaryInput = Pick<Car, 'id' | 'price' | 'expenses_reviewed' | 'benefits_reviewed'> & {
+  expenses: readonly Pick<Car['expenses'][number], 'amount'>[];
+  benefits: readonly Pick<Car['benefits'][number], 'amount'>[];
+};
+
+export function fixtureSummary(car: SummaryInput): Summary {
+  function summarize(items: readonly { amount: number | null }[]) {
     return items.reduce(
       (result, { amount }) => ({
         total: result.total + (amount ?? 0),
@@ -14,6 +19,14 @@ export function fixtureSummary(car: Car): Summary {
   const expenses = summarize(car.expenses);
   const benefits = summarize(car.benefits);
   const acquisitionCost = car.price + expenses.total;
+  const adjustedCost = acquisitionCost - benefits.total;
+  if (
+    ![car.price, expenses.total, benefits.total, acquisitionCost, adjustedCost].every(
+      Number.isSafeInteger,
+    )
+  ) {
+    throw new RangeError('Денежный итог превышает точный диапазон целых чисел.');
+  }
   const complete =
     car.expenses_reviewed && car.benefits_reviewed && !expenses.unknown && !benefits.unknown;
 
@@ -23,7 +36,7 @@ export function fixtureSummary(car: Car): Summary {
     total_expenses: expenses.total,
     total_benefits: benefits.total,
     acquisition_cost: acquisitionCost,
-    adjusted_cost: acquisitionCost - benefits.total,
+    adjusted_cost: adjustedCost,
     assessment_status: complete ? 'complete' : 'incomplete',
     unknown_expenses: expenses.unknown,
     unknown_benefits: benefits.unknown,

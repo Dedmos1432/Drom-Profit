@@ -38,6 +38,12 @@ export function createMockStore(
       return token;
     },
     list,
+    mutateCar<T>(token: string, id: string, change: (car: Car) => T) {
+      return transact(token, (cars) => {
+        const car = cars.find((candidate) => candidate.id === id);
+        return car ? change(car) : undefined;
+      });
+    },
     add(token: string, input: CarInput) {
       return transact(token, (cars) => {
         const car: Car = {

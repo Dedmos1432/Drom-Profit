@@ -1,6 +1,9 @@
 import { setupServer } from 'msw/node';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
+import { vehiclePath } from '@/entities/vehicle/api';
 import type { Car, Listing } from '@/entities/vehicle/api';
+import { updateRecord } from '@/entities/vehicle/records';
+import type { Benefit, Expense, Note } from '@/entities/vehicle/records';
 import { createApiClient } from '@/shared/api/client';
 import type { components } from '@/shared/api/schema';
 import { handlers } from './handlers';
@@ -58,4 +61,151 @@ it('previews without saving, persists a created car, enforces ownership and dele
   server.resetHandlers(...handlers(config, localStorage));
   expect(await owner.request('/api/cars')).toEqual([]);
   await expect(owner.request(detail)).rejects.toMatchObject({ status: 404 });
+});
+
+async function createCar() {
+  const api = await openSession();
+  const car = await api.request<Car>('/api/cars', {
+    method: 'POST',
+    body: { source: 'manual', brand: 'Toyota', model: 'Camry', price: 100000, year: 2010 },
+  });
+  return { api, car, path: vehiclePath(car.id) };
+}
+
+it('patches only supplied car fields and applies explicit review flags after a reset', async () => {
+  const { api, path } = await createCar();
+  await api.request(path, {
+    method: 'PATCH',
+    body: { expenses_reviewed: true, benefits_reviewed: true },
+  });
+  expect(await api.request(`${path}/summary`)).toMatchObject({ assessment_status: 'complete' });
+  expect(await api.request(path, { method: 'PATCH', body: { price: 100000 } })).toMatchObject({
+    expenses_reviewed: true,
+    benefits_reviewed: true,
+  });
+  expect(
+    await api.request(path, { method: 'PATCH', body: { year: null, benefits_reviewed: true } }),
+  ).toMatchObject({
+    brand: 'Toyota',
+    year: null,
+    price: 100000,
+    expenses_reviewed: false,
+    benefits_reviewed: true,
+  });
+});
+
+it('handles expense and benefit CRUD, resets only the affected flag and rejects double accounting', async () => {
+  const { api, car, path } = await createCar();
+  const id = car.id;
+  const summary = `${path}/summary` as const;
+  await api.request(path, {
+    method: 'PATCH',
+    body: { expenses_reviewed: true, benefits_reviewed: true },
+  });
+  const expense = (await updateRecord(api, id, 'expenses', {
+    action: 'create',
+    body: { kind: 'repair', title: 'Ремонт', amount: null },
+  })) as Expense;
+  expect(await api.request(path)).toMatchObject({
+    expenses_reviewed: false,
+    benefits_reviewed: true,
+  });
+  expect(await api.request(summary)).toMatchObject({ total_expenses: 0, unknown_expenses: 1 });
+  await updateRecord(api, id, 'expenses', {
+    action: 'edit',
+    itemId: expense.id,
+    body: { amount: 5000 },
+  });
+  await api.request(path, { method: 'PATCH', body: { expenses_reviewed: true } });
+
+  const benefit = (await updateRecord(api, id, 'benefits', {
+    action: 'create',
+    body: { title: 'Шины', amount: 12000, factor_key: 'winter_tires' },
+  })) as Benefit;
+  expect(await api.request(path)).toMatchObject({
+    expenses_reviewed: true,
+    benefits_reviewed: false,
+  });
+  expect(await api.request(summary)).toMatchObject({
+    acquisition_cost: 105000,
+    adjusted_cost: 93000,
+    unknown_expenses: 0,
+  });
+  await expect(
+    updateRecord(api, id, 'expenses', {
+      action: 'create',
+      body: { kind: 'missing_equipment', title: 'Шины', amount: 0, factor_key: 'winter_tires' },
+    }),
+  ).rejects.toMatchObject({ status: 400, code: 'double_count' });
+  await expect(
+    updateRecord(api, id, 'benefits', {
+      action: 'create',
+      body: { title: 'Шины', amount: null, factor_key: 'winter_tires' },
+    }),
+  ).rejects.toMatchObject({ status: 400, code: 'duplicate_factor' });
+  await updateRecord(api, id, 'benefits', {
+    action: 'edit',
+    itemId: benefit.id,
+    body: { amount: 0 },
+  });
+  expect(await api.request(summary)).toMatchObject({ adjusted_cost: 105000, unknown_benefits: 0 });
+  await api.request(path, { method: 'PATCH', body: { benefits_reviewed: true } });
+  await updateRecord(api, id, 'benefits', { action: 'delete', itemId: benefit.id });
+  expect(await api.request(path)).toMatchObject({
+    expenses_reviewed: true,
+    benefits_reviewed: false,
+  });
+  await updateRecord(api, id, 'expenses', { action: 'delete', itemId: expense.id });
+  server.resetHandlers(...handlers(config, localStorage));
+  expect(await api.request(path)).toMatchObject({
+    expenses: [],
+    benefits: [],
+    expenses_reviewed: false,
+    benefits_reviewed: false,
+  });
+  expect(await api.request(summary)).toMatchObject({
+    acquisition_cost: 100000,
+    adjusted_cost: 100000,
+  });
+});
+
+it('persists note edits without changing a summary or giving other sessions write access', async () => {
+  const { api, car, path } = await createCar();
+  const other = await openSession();
+  const summary = `${path}/summary` as const;
+  await api.request(path, {
+    method: 'PATCH',
+    body: { expenses_reviewed: true, benefits_reviewed: true },
+  });
+  const before = await api.request(summary);
+  const note = (await updateRecord(api, car.id, 'notes', {
+    action: 'create',
+    body: { kind: 'report', text: 'Есть сервисные записи.' },
+  })) as Note;
+  await expect(other.request(path, { method: 'PATCH', body: { price: 1 } })).rejects.toMatchObject({
+    status: 404,
+  });
+  await expect(
+    updateRecord(other, car.id, 'notes', {
+      action: 'delete',
+      itemId: note.id,
+    }),
+  ).rejects.toMatchObject({ status: 404 });
+  await updateRecord(api, car.id, 'notes', {
+    action: 'edit',
+    itemId: note.id,
+    body: { kind: 'inspection', text: 'Осмотр пройден.' },
+  });
+  server.resetHandlers(...handlers(config, localStorage));
+  expect(await api.request(path)).toMatchObject({
+    notes: [{ id: note.id, kind: 'inspection', text: 'Осмотр пройден.' }],
+    expenses_reviewed: true,
+    benefits_reviewed: true,
+  });
+  await updateRecord(api, car.id, 'notes', { action: 'delete', itemId: note.id });
+  await expect(
+    updateRecord(api, car.id, 'notes', { action: 'delete', itemId: note.id }),
+  ).rejects.toMatchObject({ status: 404 });
+  expect(await api.request(path)).toMatchObject({ notes: [] });
+  expect(await api.request(summary)).toEqual(before);
 });
