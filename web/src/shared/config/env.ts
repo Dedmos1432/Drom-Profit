@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 const apiMode = z.enum(['mock', 'real']);
 const apiBaseUrl = z.url({ protocol: /^https?$/ });
+const mockScenario = z.enum(['empty', 'seeded', 'list-error']);
 
 export function readConfig() {
   const mode = apiMode.parse(
@@ -11,5 +12,9 @@ export function readConfig() {
     import.meta.env.VITE_API_BASE_URL?.trim() ||
       (mode === 'mock' ? window.location.origin : 'http://localhost:8000'),
   );
-  return { mode, baseUrl };
+  const scenario =
+    mode === 'mock' ? mockScenario.parse(import.meta.env.VITE_MOCK_SCENARIO || 'empty') : 'empty';
+  return { mode, baseUrl, scenario };
 }
+
+export type AppConfig = ReturnType<typeof readConfig>;

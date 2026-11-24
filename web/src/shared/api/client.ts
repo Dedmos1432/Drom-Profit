@@ -36,6 +36,7 @@ function isContractError(value: unknown): value is ContractError {
 type ApiClientOptions = {
   baseUrl: string;
   getToken?: () => string | null;
+  onUnauthorized?: () => void;
   fetcher?: typeof fetch;
 };
 
@@ -43,7 +44,12 @@ export function apiUrl(baseUrl: string, path: string) {
   return baseUrl.replace(/\/+$/, '') + path;
 }
 
-export function createApiClient({ baseUrl, getToken, fetcher = fetch }: ApiClientOptions) {
+export function createApiClient({
+  baseUrl,
+  getToken,
+  onUnauthorized,
+  fetcher = fetch,
+}: ApiClientOptions) {
   async function request<Result>(
     path: ApiPath,
     { method = 'GET', body, signal }: RequestOptions = {},
@@ -91,6 +97,7 @@ export function createApiClient({ baseUrl, getToken, fetcher = fetch }: ApiClien
     }
 
     if (!response.ok) {
+      if (response.status === 401 && token) onUnauthorized?.();
       const code = isContractError(payload) ? payload.code : 'http_' + response.status;
       const message = isContractError(payload)
         ? payload.message

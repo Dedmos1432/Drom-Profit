@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Outlet, useLocation } from 'react-router';
 import { Container, Link } from '@/shared/ui';
 import { Header } from '@/widgets/header/Header';
+import { classes } from '@/shared/lib/classes';
 import styles from './AppLayout.module.css';
 
 export function AppLayout() {
@@ -21,7 +22,12 @@ export function AppLayout() {
         К основному содержимому
       </Link>
       <Header />
-      <main id="main-content" tabIndex={-1} ref={main} className={styles.main}>
+      <main
+        id="main-content"
+        tabIndex={-1}
+        ref={main}
+        className={classes(styles.main, pathname !== '/ui-kit' && styles.productMain)}
+      >
         <Container>
           <Outlet />
         </Container>

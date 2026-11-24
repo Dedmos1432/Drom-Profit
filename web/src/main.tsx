@@ -13,12 +13,12 @@ async function start() {
   const config = readConfig();
   if (config.mode === 'mock') {
     const { startMockApi } = await import('@/mocks/browser');
-    await startMockApi(config.baseUrl);
+    await startMockApi(config);
   }
 
   root.render(
     <StrictMode>
-      <App />
+      <App config={config} />
     </StrictMode>,
   );
 }

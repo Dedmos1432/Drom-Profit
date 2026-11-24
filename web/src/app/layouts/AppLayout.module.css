@@ -6,6 +6,15 @@
   outline: none;
 }
 
+.productMain {
+  min-block-size: calc(100dvh - var(--dp-component-header-min-height));
+  background: var(--dp-color-semantic-background-surface);
+}
+
+:global(body):has(.productMain) {
+  background: var(--dp-color-semantic-background-surface);
+}
+
 .skip {
   position: absolute;
   z-index: 5;
