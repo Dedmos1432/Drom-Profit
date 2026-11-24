@@ -26,6 +26,19 @@ x-app: &app
       bind:
         create_host_path: false
 
+x-loopback: &loopback
+  image: python:3.14.0-slim-bookworm
+  pull_policy: never
+  user: "10001:10001"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  sysctls:
+    net.ipv4.ip_forward: "0"
+  volumes:
+    - ./loopback_proxy.py:/loopback_proxy.py:ro
+  entrypoint: ["python", "-B", "/loopback_proxy.py"]
+
 services:
   postgres:
     <<: *postgres
@@ -34,7 +47,6 @@ services:
       POSTGRES_DB: drom_profit
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD locally}
     networks: [database]
-    ports: ["127.0.0.1:55432:5432"]
     volumes: [postgres_data:/var/lib/postgresql/data]
 
   migrate:
@@ -55,7 +67,6 @@ services:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
-    ports: ["127.0.0.1:8000:8000"]
     healthcheck:
       test: ["CMD", "python", "-c", "from http.client import HTTPConnection; c=HTTPConnection('127.0.0.1',8000,timeout=2); c.request('GET','/openapi.json'); assert c.getresponse().status==200"]
       interval: 10s
@@ -71,7 +82,6 @@ services:
       POSTGRES_DB: drom_profit_test
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD locally}
     networks: [test-database]
-    ports: ["127.0.0.1:55433:5432"]
     tmpfs: [/var/lib/postgresql/data]
 
   tests:
@@ -93,7 +103,47 @@ services:
       DROM_LOAD_ROUNDS: ${DROM_LOAD_ROUNDS:-5}
     volumes: *shared
 
+  api-loopback:
+    <<: *loopback
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      ingress:
+        gw_priority: 1
+      database: {}
+    command: ["8000", "backend", "8000"]
+    ports: ["127.0.0.1:8000:8000"]
+
+  postgres-loopback:
+    <<: *loopback
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      ingress:
+        gw_priority: 1
+      database: {}
+    command: ["5432", "postgres", "5432"]
+    ports: ["127.0.0.1:55432:5432"]
+
+  postgres-test-loopback:
+    <<: *loopback
+    profiles: [test]
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    networks:
+      ingress:
+        gw_priority: 1
+      test-database: {}
+    command: ["5432", "postgres-test", "5432"]
+    ports: ["127.0.0.1:55433:5432"]
+
 networks:
+  ingress:
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
   database:
     internal: true
   test-database:

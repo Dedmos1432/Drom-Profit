@@ -4,12 +4,46 @@ FastAPI хранит анонимные выборки в PostgreSQL. API исп
 
 ## Локальный запуск через Docker Compose
 
-Нужны Docker Engine со сборщиком образов, Docker Compose v2+ и клон репозитория вместе с `shared/`. Из корня перейдите в `backend/`. При первом запуске создайте локальный `.env` из примера и заполните `POSTGRES_PASSWORD` случайным значением. Сохраните файл для следующих запусков с тем же volume.
+На Linux нужен Docker Engine со сборщиком образов. На Windows и macOS используйте Docker Desktop. В Windows выберите режим Linux containers. Для публикации портов нужен Engine с поддержкой приоритета шлюза сети. Конфигурация проверена на Engine 29. Compose **2.33.1 или новее** поддерживает используемый параметр `gw_priority`. Версии сервера и Compose показывают `docker version` и `docker compose version`.
+
+Клонируйте репозиторий целиком, вместе с `shared/`. Из корня перейдите в `backend/` командой `cd backend`. Все команды ниже выполняются из этого каталога.
+
+### Создание локального .env
+
+Команды создают `.env` из `.env.example` и записывают случайный пароль. Существующий файл остается прежним. Храните его для повторных запусков с тем же volume.
+
+**Linux и macOS — Bash** (нужен `openssl`). Новый файл получает права `600`.
 
 ```bash
-cd backend
-(umask 077; cp -n .env.example .env)
-# Укажите пароль в .env перед запуском
+if [[ ! -e .env && ! -L .env ]]; then
+  (
+    umask 077
+    set -o noclobber
+    password=$(openssl rand -hex 32) &&
+      sed "s/^POSTGRES_PASSWORD=$/POSTGRES_PASSWORD=$password/" .env.example > .env
+  )
+fi
+```
+
+**Windows — PowerShell**. Файл наследует права папки. Используйте личную папку с ограниченным доступом. Права можно проверить на вкладке **Безопасность** в свойствах файла.
+
+```powershell
+if (-not (Test-Path -LiteralPath .env)) {
+    $bytes = [byte[]]::new(32)
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
+    $password = [BitConverter]::ToString($bytes).Replace('-', '').ToLowerInvariant()
+    $template = Get-Content -LiteralPath .env.example -Raw
+    $content = $template -replace '(?m)^POSTGRES_PASSWORD=(?=\r?$)', "POSTGRES_PASSWORD=$password"
+    $stream = [IO.File]::Open((Join-Path $PWD.Path '.env'), [IO.FileMode]::CreateNew)
+    $writer = [IO.StreamWriter]::new($stream)
+    try { $writer.Write($content) } finally { $writer.Dispose() }
+}
+```
+
+### Запуск
+
+```text
 docker compose up --build -d
 docker compose ps -a
 ```
@@ -20,11 +54,11 @@ Compose запускает PostgreSQL, дожидается его healthcheck �
 
 - REST доступен по [127.0.0.1:8000/api](http://127.0.0.1:8000/api/cars). Для начала работы создайте сессию через `POST /api/session`.
 - [Swagger UI](http://127.0.0.1:8000/docs) и [OpenAPI JSON](http://127.0.0.1:8000/openapi.json) доступны без токена. Стандартный Swagger UI FastAPI загружает ресурсы в браузере с CDN. При запрете внешней сети используйте JSON или локальный YAML.
-- API и БД опубликованы только на loopback. Данные PostgreSQL размещены в именованном volume. Внутренние сети рабочей и тестовой БД разделены.
+- Порты хоста слушают только loopback. Сервисы `api-loopback`, `postgres-loopback` и `postgres-test-loopback` передают TCP в соответствующую внутреннюю сеть. API, PostgreSQL и тесты остаются во внутренних сетях Docker. Фактическую публикацию API показывает `docker compose port api-loopback 8000`. Данные основной БД хранятся в именованном volume.
 
 ### Разработка, миграции и остановка
 
-```bash
+```text
 docker compose -f compose.yaml -f compose.dev.yaml up --build -d
 docker compose run --rm migrate
 docker compose run --rm migrate python -m alembic check
@@ -44,16 +78,37 @@ docker compose down
 
 ### Альтернативный запуск через venv
 
-При таком запуске нужен Python 3.11+ и окружение с зависимостями backend. Команды выполняются из `backend/`. Для пустого окружения установка из локального wheelhouse выполняется один раз после получения пакетов. Запускайте этот вариант при свободном порте 8000.
+Нужен Python 3.11+ и свободный порт 8000. Подготовьте `.env` как описано выше. Для venv используются простые строки `ИМЯ=значение` из `.env.example`. PostgreSQL и прокси по-прежнему работают в Docker. Для автономного запуска заранее загрузите `postgres:17.6-bookworm` и `python:3.14.0-slim-bookworm` в локальное хранилище Docker.
+
+**Linux и macOS — Bash**
 
 ```bash
-source /tmp/drom-profit-core-venv/bin/activate  # либо активируйте свою .venv
-python -m pip install --no-index --find-links="$WHEELHOUSE" -r requirements-dev.txt
+python3 -m venv .venv
+source .venv/bin/activate
 set -a
 . ./.env
 set +a
 export PGPASSWORD="$POSTGRES_PASSWORD"
-docker compose up --pull never -d --wait postgres
+```
+
+**Windows — PowerShell**. Добавление Python из venv в `PATH` действует только в текущем окне и позволяет обойтись без запуска `Activate.ps1`.
+
+```powershell
+py -3 -m venv .venv
+$env:Path = "$(Join-Path $PWD.Path '.venv/Scripts');$env:Path"
+Get-Content -LiteralPath .env | ForEach-Object {
+    if ($_ -match '^([A-Za-z_][A-Za-z0-9_]*)=(.*)$') {
+        Set-Item -LiteralPath "Env:$($Matches[1])" -Value $Matches[2]
+    }
+}
+$env:PGPASSWORD = $env:POSTGRES_PASSWORD
+```
+
+Далее команды одинаковы. Установка зависимостей нужна один раз. Для установки из локального каталога `wheelhouse/` используйте `python -m pip install --no-index --find-links=./wheelhouse -r requirements-dev.txt`.
+
+```text
+python -m pip install -r requirements-dev.txt
+docker compose up --pull never -d --wait postgres-loopback
 python -m alembic upgrade head
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
@@ -66,7 +121,7 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 ### Перенос существующих данных
 
-Первичная ревизия `0001_core` создает схему в новой БД. Сервис не читает и не удаляет старые SQLite-файлы. Если данные понадобятся, сначала остановите запись старой версии и сделайте согласованную резервную копию SQLite средствами SQLite backup, включая данные из WAL. Проверьте копию и перенос на отдельной PostgreSQL. До записи проверьте диапазоны, текст с нулевыми байтами, дубли ключей, ссылки и ограничения. В одной транзакции перенесите сессии, карточки и затем вложенные записи, сохранив ID, хеши токенов, NULL и флаги. Сверьте числа строк, контрольные суммы и результаты расчетов. Переключение DSN требует отдельного решения после проверки. Сохраните исходную копию для возврата; новые записи после переключения требуют отдельной сверки при откате.
+Первичная ревизия `0001_core` создает схему в новой БД. Сервис не читает и не удаляет старые SQLite-файлы. Если данные понадобятся, сначала остановите запись старой версии и сделайте согласованную резервную копию SQLite средствами SQLite backup, включая данные из WAL. Проверьте копию и перенос на отдельной PostgreSQL. До записи проверьте диапазоны, текст с нулевыми байтами, дубли ключей, ссылки и ограничения. В одной транзакции перенесите сессии, карточки и затем вложенные записи, сохранив ID, хеши токенов, NULL и флаги. Сверьте числа строк, контрольные суммы и результаты расчетов. Переключение DSN требует отдельного решения после проверки. Сохраните исходную копию для возврата. При откате отдельно сверьте записи, созданные после переключения.
 
 ## Проверка через Swagger
 
@@ -83,9 +138,9 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 ## Тесты
 
-Тестовый контейнер использует сетевой namespace отдельного `postgres-test` и подключается к `drom_profit_test` по loopback. Каждый тест мигрирует собственную временную схему. Docker публикует тестовую БД на порту 55433 хоста для venv. Для первого запуска тестового образа нужна согласованная сборка.
+Тестовый контейнер использует сетевой namespace отдельного `postgres-test` и подключается к `drom_profit_test` по loopback. Каждый тест мигрирует собственную временную схему. Для запуска pytest из venv запустите сервис `postgres-test-loopback`, который публикует тестовую БД на порту 55433 хоста. Для первого запуска тестового образа нужна согласованная сборка.
 
-```bash
+```text
 docker compose --profile test build tests
 docker compose --profile test up --pull never -d --wait postgres-test
 docker compose --profile test run --rm tests
@@ -94,6 +149,6 @@ docker compose --profile test run --rm tests python -m pytest -q -s -p no:cachep
 docker compose --profile test stop postgres-test
 ```
 
-При запуске через venv используйте те же PostgreSQL и окружение из раздела выше, затем `python -m pytest -q` и `python -m pytest -q -s tests/load_postgres.py`.
+При запуске через venv загрузите окружение из раздела выше, выполните `docker compose --profile test up --pull never -d --wait postgres-test-loopback`, затем `python -m pytest -q` и `python -m pytest -q -s tests/load_postgres.py`.
 
 Нагрузка поднимает Uvicorn внутри тестового контейнера. Сценарии используют 1, 10, 50 и 100 конкурентных пользователей, по умолчанию по 5 циклов и 9 запросов за цикл. JSON-отчет содержит среднее время ответа, медиану, P95, P99, RPS, успешность, ошибки, конфликты и параметры среды. Для другого числа циклов задайте `DROM_LOAD_ROUNDS`.
