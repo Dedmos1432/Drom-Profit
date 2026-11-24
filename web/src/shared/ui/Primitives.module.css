@@ -1,0 +1,47 @@
+.link {
+  color: var(--dp-color-semantic-text-link);
+  text-decoration: underline;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-inline-size: 100%;
+  padding: var(--dp-component-badge-padding-block) var(--dp-component-badge-padding-inline);
+  border-radius: var(--dp-component-badge-radius);
+  font-size: var(--dp-typography-size-caption);
+  line-height: var(--dp-typography-line-height-caption);
+  font-weight: var(--dp-typography-weight-semibold);
+}
+
+.neutral {
+  color: var(--dp-color-semantic-text-secondary);
+  background: var(--dp-color-semantic-background-subtle);
+}
+
+.info {
+  color: var(--dp-color-semantic-status-info-text);
+  background: var(--dp-color-semantic-status-info-surface);
+}
+
+.success {
+  color: var(--dp-color-semantic-status-success-text);
+  background: var(--dp-color-semantic-status-success-surface);
+}
+
+.warning {
+  color: var(--dp-color-semantic-status-warning-text);
+  background: var(--dp-color-semantic-status-warning-surface);
+}
+
+.error {
+  color: var(--dp-color-semantic-status-error-text);
+  background: var(--dp-color-semantic-status-error-surface);
+}
+
+.divider {
+  margin: 0;
+  border: 0;
+  border-block-start: var(--dp-border-thin) solid var(--dp-color-semantic-border-divider);
+}

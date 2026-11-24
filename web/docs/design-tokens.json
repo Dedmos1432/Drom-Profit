@@ -1,7 +1,7 @@
 {
   "$meta": {
     "name": "Drom Profit Web",
-    "status": "draft",
+    "status": "approved",
     "classification": "Proposed",
     "audit": "DROM_VISUAL_AUDIT.md",
     "mode": "light",
@@ -17,19 +17,25 @@
       "pressedGray": { "$type": "color", "$value": "#E3E8EE" },
       "lineGray": { "$type": "color", "$value": "#DBE1E8" },
       "controlGray": { "$type": "color", "$value": "#7C8998" },
-      "red": { "$type": "color", "$value": "#B42333" },
-      "redStrong": { "$type": "color", "$value": "#981C2A" },
-      "redPressed": { "$type": "color", "$value": "#7C1924" },
-      "redSoft": { "$type": "color", "$value": "#FBECEF" },
-      "blue": { "$type": "color", "$value": "#185B99" },
+      "red": { "$type": "color", "$value": "#A11D2A" },
+      "redStrong": { "$type": "color", "$value": "#841723" },
+      "redPressed": { "$type": "color", "$value": "#69121B" },
+      "redSoft": { "$type": "color", "$value": "#FFEBED" },
+      "blue": { "$type": "color", "$value": "#1A76CB" },
       "blueStrong": { "$type": "color", "$value": "#124478" },
       "blueFocus": { "$type": "color", "$value": "#245FA5" },
-      "blueSoft": { "$type": "color", "$value": "#EAF2FB" },
+      "blueSoft": { "$type": "color", "$value": "#E4F1FC" },
       "green": { "$type": "color", "$value": "#266245" },
-      "greenSoft": { "$type": "color", "$value": "#EAF5EF" },
+      "greenSoft": { "$type": "color", "$value": "#EAFDDD" },
       "amber": { "$type": "color", "$value": "#724407" },
-      "amberSoft": { "$type": "color", "$value": "#FFF4D9" },
-      "veil": { "$type": "color", "$value": "rgba(32, 38, 45, 0.48)" }
+      "veil": { "$type": "color", "$value": "rgba(32, 38, 45, 0.48)" },
+      "brandRed": { "$type": "color", "$value": "#DB001A" },
+      "black": { "$type": "color", "$value": "#000000" },
+      "blueHover": { "$type": "color", "$value": "#1766B0" },
+      "blueSoftHover": { "$type": "color", "$value": "#D4E9FC" },
+      "blueSoftPressed": { "$type": "color", "$value": "#C4E0F8" },
+      "panelGray": { "$type": "color", "$value": "#F5F5F5" },
+      "warningSoft": { "$type": "color", "$value": "#FFF9D6" }
     },
     "semantic": {
       "background": {
@@ -38,7 +44,8 @@
         "subtle": { "$type": "color", "$value": "{color.palette.softGray}" },
         "hover": { "$type": "color", "$value": "{color.palette.softGray}" },
         "pressed": { "$type": "color", "$value": "{color.palette.pressedGray}" },
-        "overlay": { "$type": "color", "$value": "{color.palette.veil}" }
+        "overlay": { "$type": "color", "$value": "{color.palette.veil}" },
+        "panel": { "$type": "color", "$value": "{color.palette.panelGray}" }
       },
       "text": {
         "primary": { "$type": "color", "$value": "{color.palette.ink}" },
@@ -47,7 +54,7 @@
         "placeholder": { "$type": "color", "$value": "{color.palette.mutedInk}" },
         "disabled": { "$type": "color", "$value": "{color.palette.mutedInk}" },
         "inverse": { "$type": "color", "$value": "{color.palette.white}" },
-        "link": { "$type": "color", "$value": "{color.palette.blue}" },
+        "link": { "$type": "color", "$value": "{color.palette.blueHover}" },
         "linkHover": { "$type": "color", "$value": "{color.palette.blueStrong}" }
       },
       "border": {
@@ -55,14 +62,23 @@
         "control": { "$type": "color", "$value": "{color.palette.controlGray}" }
       },
       "action": {
-        "primary": { "$type": "color", "$value": "{color.palette.red}" },
-        "primaryHover": { "$type": "color", "$value": "{color.palette.redStrong}" },
-        "primaryPressed": { "$type": "color", "$value": "{color.palette.redPressed}" },
-        "secondary": { "$type": "color", "$value": "{color.palette.white}" },
+        "primary": { "$type": "color", "$value": "{color.palette.blue}" },
+        "primaryHover": { "$type": "color", "$value": "{color.palette.blueHover}" },
+        "primaryPressed": { "$type": "color", "$value": "{color.palette.blueStrong}" },
+        "secondary": { "$type": "color", "$value": "{color.palette.blueSoft}" },
         "disabled": { "$type": "color", "$value": "{color.palette.softGray}" },
         "focus": { "$type": "color", "$value": "{color.palette.blueFocus}" },
-        "selectedSurface": { "$type": "color", "$value": "{color.palette.redSoft}" },
-        "selectedText": { "$type": "color", "$value": "{color.palette.redStrong}" }
+        "selectedSurface": { "$type": "color", "$value": "{color.palette.blueSoft}" },
+        "selectedText": { "$type": "color", "$value": "{color.palette.blueStrong}" },
+        "secondaryHover": { "$type": "color", "$value": "{color.palette.blueSoftHover}" },
+        "secondaryPressed": { "$type": "color", "$value": "{color.palette.blueSoftPressed}" },
+        "secondaryText": { "$type": "color", "$value": "{color.palette.blueStrong}" },
+        "contrast": { "$type": "color", "$value": "{color.palette.black}" },
+        "contrastHover": { "$type": "color", "$value": "{color.palette.ink}" },
+        "outline": { "$type": "color", "$value": "{color.palette.blueHover}" },
+        "danger": { "$type": "color", "$value": "{color.palette.red}" },
+        "dangerHover": { "$type": "color", "$value": "{color.palette.redStrong}" },
+        "dangerPressed": { "$type": "color", "$value": "{color.palette.redPressed}" }
       },
       "status": {
         "infoText": { "$type": "color", "$value": "{color.palette.blueStrong}" },
@@ -70,15 +86,18 @@
         "successText": { "$type": "color", "$value": "{color.palette.green}" },
         "successSurface": { "$type": "color", "$value": "{color.palette.greenSoft}" },
         "warningText": { "$type": "color", "$value": "{color.palette.amber}" },
-        "warningSurface": { "$type": "color", "$value": "{color.palette.amberSoft}" },
-        "errorText": { "$type": "color", "$value": "{color.palette.redStrong}" },
+        "warningSurface": { "$type": "color", "$value": "{color.palette.warningSoft}" },
+        "errorText": { "$type": "color", "$value": "{color.palette.red}" },
         "errorSurface": { "$type": "color", "$value": "{color.palette.redSoft}" }
+      },
+      "brand": {
+        "accent": { "$type": "color", "$value": "{color.palette.brandRed}" }
       }
     }
   },
   "typography": {
     "family": {
-      "ui": { "$type": "fontFamily", "$value": "system-ui, Arial, 'Segoe UI', sans-serif" }
+      "ui": { "$type": "fontFamily", "$value": "system-ui, Arial, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif" }
     },
     "weight": {
       "regular": { "$type": "fontWeight", "$value": 400 },
@@ -89,24 +108,24 @@
     "size": {
       "caption": { "$type": "dimension", "$value": "13px" },
       "compact": { "$type": "dimension", "$value": "14px" },
-      "body": { "$type": "dimension", "$value": "15px" },
+      "body": { "$type": "dimension", "$value": "14px" },
       "controlMobile": { "$type": "dimension", "$value": "16px" },
       "cardTitle": { "$type": "dimension", "$value": "18px" },
-      "section": { "$type": "dimension", "$value": "22px" },
-      "pageCompact": { "$type": "dimension", "$value": "28px" },
-      "page": { "$type": "dimension", "$value": "34px" },
+      "section": { "$type": "dimension", "$value": "24px" },
+      "pageCompact": { "$type": "dimension", "$value": "24px" },
+      "page": { "$type": "dimension", "$value": "36px" },
       "amount": { "$type": "dimension", "$value": "30px" }
     },
     "lineHeight": {
-      "caption": { "$type": "dimension", "$value": "18px" },
+      "caption": { "$type": "dimension", "$value": "16.9px" },
       "compact": { "$type": "dimension", "$value": "20px" },
-      "body": { "$type": "dimension", "$value": "23px" },
+      "body": { "$type": "dimension", "$value": "21.7px" },
       "controlMobile": { "$type": "dimension", "$value": "24px" },
-      "cardTitle": { "$type": "dimension", "$value": "24px" },
-      "section": { "$type": "dimension", "$value": "29px" },
-      "pageCompact": { "$type": "dimension", "$value": "36px" },
-      "page": { "$type": "dimension", "$value": "43px" },
-      "amount": { "$type": "dimension", "$value": "38px" }
+      "cardTitle": { "$type": "dimension", "$value": "25.02px" },
+      "section": { "$type": "dimension", "$value": "31.2px" },
+      "pageCompact": { "$type": "dimension", "$value": "31.2px" },
+      "page": { "$type": "dimension", "$value": "46.8px" },
+      "amount": { "$type": "dimension", "$value": "39px" }
     },
     "letterSpacing": {
       "default": { "$type": "keyword", "$value": "normal" }
@@ -137,10 +156,11 @@
   },
   "radius": {
     "mark": { "$type": "dimension", "$value": "6px" },
-    "control": { "$type": "dimension", "$value": "10px" },
+    "control": { "$type": "dimension", "$value": "12px" },
     "image": { "$type": "dimension", "$value": "12px" },
     "panel": { "$type": "dimension", "$value": "16px" },
-    "pill": { "$type": "dimension", "$value": "999px" }
+    "pill": { "$type": "dimension", "$value": "999px" },
+    "panelLarge": { "$type": "dimension", "$value": "24px" }
   },
   "border": {
     "thin": { "$type": "dimension", "$value": "1px" },
@@ -149,7 +169,7 @@
   },
   "shadow": {
     "flat": { "$type": "shadow", "$value": "none" },
-    "overlay": { "$type": "shadow", "$value": "0 10px 28px rgba(32, 38, 45, 0.16), 0 2px 6px rgba(32, 38, 45, 0.08)" }
+    "overlay": { "$type": "shadow", "$value": "0 6px 20px rgba(27, 42, 85, 0.12)" }
   },
   "layout": {
     "containerMax": { "$type": "dimension", "$value": "1120px" },
@@ -175,8 +195,9 @@
   },
   "motion": {
     "feedback": { "$type": "duration", "$value": "150ms" },
+    "spinner": { "$type": "duration", "$value": "1000ms" },
     "reduced": { "$type": "duration", "$value": "0ms" },
-    "easing": { "$type": "cubicBezier", "$value": "ease-out" }
+    "easing": { "$type": "keyword", "$value": "ease-out" }
   },
   "component": {
     "button": {
@@ -220,7 +241,17 @@
     },
     "table": {
       "cellPaddingBlock": { "$type": "dimension", "$value": "{spacing.small}" },
-      "cellPaddingInline": { "$type": "dimension", "$value": "{spacing.field}" }
+      "cellPaddingInline": { "$type": "dimension", "$value": "{spacing.field}" },
+      "wideMin": { "$type": "dimension", "$value": "660px" }
+    },
+    "tooltip": {
+      "maxWidth": { "$type": "dimension", "$value": "256px" }
+    },
+    "layout": {
+      "inlineItemMin": { "$type": "dimension", "$value": "240px" }
+    },
+    "swatch": {
+      "minWidth": { "$type": "dimension", "$value": "140px" }
     }
   }
 }

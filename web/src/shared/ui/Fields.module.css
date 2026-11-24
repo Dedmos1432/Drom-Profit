@@ -1,0 +1,102 @@
+.field,
+.choiceGroup {
+  display: grid;
+  gap: var(--dp-spacing-tiny);
+  min-inline-size: 0;
+}
+
+.label {
+  font-weight: var(--dp-typography-weight-semibold);
+}
+
+.required,
+.error {
+  color: var(--dp-color-semantic-status-error-text);
+}
+
+.helper,
+.error {
+  font-size: var(--dp-typography-size-caption);
+  line-height: var(--dp-typography-line-height-caption);
+}
+
+.helper {
+  color: var(--dp-color-semantic-text-secondary);
+}
+
+.control {
+  display: block;
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: var(--dp-control-height);
+  padding: var(--dp-spacing-tiny) var(--dp-component-field-padding-inline);
+  color: var(--dp-color-semantic-text-primary);
+  background: var(--dp-color-semantic-background-surface);
+  border: var(--dp-border-thin) solid var(--dp-color-semantic-border-control);
+  border-radius: var(--dp-component-field-radius);
+  font-size: var(--dp-form-font-size);
+  line-height: var(--dp-form-line-height);
+}
+
+.control:hover:not(:disabled),
+.control:focus {
+  border-color: var(--dp-color-semantic-action-outline);
+}
+
+.control[aria-invalid='true'] {
+  border-color: var(--dp-color-semantic-status-error-text);
+}
+
+.control:disabled {
+  color: var(--dp-color-semantic-text-disabled);
+  background: var(--dp-color-semantic-action-disabled);
+  cursor: not-allowed;
+}
+
+.textarea {
+  min-block-size: var(--dp-component-field-textarea-min-height);
+  padding-block: var(--dp-spacing-small);
+  resize: vertical;
+}
+
+.selectWrapper {
+  position: relative;
+}
+.select {
+  appearance: none;
+  padding-inline-end: calc(var(--dp-component-field-padding-inline) * 2 + var(--dp-icon-small));
+}
+
+.chevron {
+  position: absolute;
+  inset-inline-end: var(--dp-component-field-padding-inline);
+  inset-block-start: 50%;
+  inline-size: var(--dp-icon-small);
+  block-size: var(--dp-icon-small);
+  transform: translateY(-50%);
+  color: var(--dp-color-semantic-text-secondary);
+  pointer-events: none;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: var(--dp-component-choice-gap);
+  min-block-size: var(--dp-control-height);
+  padding-block: var(--dp-spacing-hairline);
+  font-weight: var(--dp-typography-weight-regular);
+  cursor: pointer;
+}
+
+.choiceInput {
+  margin: 0;
+  flex: none;
+  inline-size: var(--dp-component-choice-mark);
+  block-size: var(--dp-component-choice-mark);
+  accent-color: var(--dp-color-semantic-action-primary);
+}
+
+.choice:has(:disabled) {
+  color: var(--dp-color-semantic-text-disabled);
+  cursor: not-allowed;
+}
