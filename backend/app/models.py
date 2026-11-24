@@ -1,0 +1,89 @@
+from uuid import uuid4
+
+from sqlalchemy import CheckConstraint, ForeignKey, String, UniqueConstraint
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class UserSession(Base):
+    __tablename__ = "sessions"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=lambda: str(uuid4()))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+
+
+class Car(Base):
+    __tablename__ = "cars"
+    __table_args__ = (CheckConstraint("price > 0"),)
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=lambda: str(uuid4()))
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), index=True)
+    source: Mapped[str]
+    listing_id: Mapped[str | None]
+    brand: Mapped[str]
+    model: Mapped[str]
+    year: Mapped[int | None]
+    price: Mapped[int]
+    mileage_km: Mapped[int | None]
+    trim: Mapped[str | None]
+    fuel_type: Mapped[str | None]
+    engine_volume_l: Mapped[float | None]
+    power_hp: Mapped[int | None]
+    transmission: Mapped[str | None]
+    drive_type: Mapped[str | None]
+    city: Mapped[str | None]
+    image_url: Mapped[str | None]
+    listing_url: Mapped[str | None]
+    market_valuation: Mapped[int | None]
+    fetched_at: Mapped[str | None]
+    expenses_reviewed: Mapped[bool] = mapped_column(default=False)
+    benefits_reviewed: Mapped[bool] = mapped_column(default=False)
+    expenses: Mapped[list["Expense"]] = relationship(
+        lazy="selectin", cascade="all, delete-orphan", passive_deletes=True
+    )
+    benefits: Mapped[list["Benefit"]] = relationship(
+        lazy="selectin", cascade="all, delete-orphan", passive_deletes=True
+    )
+    notes: Mapped[list["Note"]] = relationship(
+        lazy="selectin", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class CarItem:
+    id: Mapped[str] = mapped_column(primary_key=True, default=lambda: str(uuid4()))
+    car_id: Mapped[str] = mapped_column(ForeignKey("cars.id", ondelete="CASCADE"), index=True)
+
+
+class MonetaryFactor(CarItem):
+    title: Mapped[str]
+    amount: Mapped[int | None]
+    factor_key: Mapped[str | None]
+    comment: Mapped[str | None]
+
+
+class Expense(MonetaryFactor, Base):
+    __tablename__ = "expenses"
+    __table_args__ = (
+        CheckConstraint("amount >= 0"),
+        UniqueConstraint("car_id", "kind", "factor_key"),
+    )
+
+    kind: Mapped[str]
+
+
+class Benefit(MonetaryFactor, Base):
+    __tablename__ = "benefits"
+    __table_args__ = (
+        CheckConstraint("amount >= 0"),
+        UniqueConstraint("car_id", "factor_key"),
+    )
+
+
+class Note(CarItem, Base):
+    __tablename__ = "notes"
+
+    kind: Mapped[str]
+    text: Mapped[str]

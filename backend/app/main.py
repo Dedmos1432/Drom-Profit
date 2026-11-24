@@ -1,0 +1,90 @@
+from contextlib import asynccontextmanager
+from os import environ
+from pathlib import Path
+
+import yaml
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException
+
+from .api import car_items, cars, sessions
+from .db import make_engine
+from .errors import APIError
+from .models import Base
+from .schemas import Error
+from .services.listing_import import ListingImporter, make_demo_importer
+
+
+BACKEND = Path(__file__).resolve().parents[1]
+SHARED = BACKEND.parent / "shared"
+
+
+def error_response(status: int, code: str, message: str, headers=None) -> JSONResponse:
+    return JSONResponse(
+        status_code=status, content=Error(code=code, message=message).model_dump(), headers=headers
+    )
+
+
+def create_app(db_path: Path | None = None, importer: ListingImporter | None = None) -> FastAPI:
+    if db_path is None:
+        db_path = Path(environ.get("DROM_DB_PATH", str(BACKEND / "drom-profit.sqlite3")))
+    db_path = db_path.resolve()
+    contract = yaml.safe_load((SHARED / "openapi.yaml").read_text("utf-8"))
+    if importer is None:
+        importer = make_demo_importer(SHARED / "fixtures" / "import-listings.json")
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        engine = make_engine(db_path)
+        app.state.engine = engine
+        try:
+            with engine.begin() as connection:
+                connection.exec_driver_sql("BEGIN IMMEDIATE")
+                Base.metadata.create_all(connection)
+            yield
+        finally:
+            engine.dispose()
+
+    app = FastAPI(
+        title=contract["info"]["title"], version=contract["info"]["version"], lifespan=lifespan
+    )
+    app.openapi = lambda: contract
+    app.state.import_listing = importer
+    origins = [
+        origin.strip()
+        for origin in environ.get("DROM_CORS_ORIGINS", "").split(",")
+        if origin.strip()
+    ]
+    if "*" in origins:
+        raise ValueError("DROM_CORS_ORIGINS требует список точных origins")
+    if origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=origins,
+            allow_methods=["GET", "POST", "PATCH", "DELETE"],
+            allow_headers=["Authorization", "Content-Type"],
+        )
+
+    @app.exception_handler(HTTPException)
+    async def handle_http_error(_request: Request, error: HTTPException) -> JSONResponse:
+        code = error.code if isinstance(error, APIError) else f"http_{error.status_code}"
+        return error_response(error.status_code, code, error.detail, error.headers)
+
+    @app.exception_handler(RequestValidationError)
+    async def handle_validation_error(
+        _request: Request, _error: RequestValidationError
+    ) -> JSONResponse:
+        return error_response(422, "validation_error", "Проверьте поля запроса")
+
+    @app.exception_handler(Exception)
+    async def handle_server_error(_request: Request, _error: Exception) -> JSONResponse:
+        return error_response(500, "internal_error", "Внутренняя ошибка сервера")
+
+    for router in (sessions.router, cars.router, car_items.router):
+        app.include_router(router, prefix="/api")
+    return app
+
+
+app = create_app()
