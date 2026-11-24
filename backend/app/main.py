@@ -79,8 +79,15 @@ def create_app(db_path: Path | None = None, importer: ListingImporter | None = N
         return error_response(422, "validation_error", "Проверьте поля запроса")
 
     @app.exception_handler(Exception)
-    async def handle_server_error(_request: Request, _error: Exception) -> JSONResponse:
-        return error_response(500, "internal_error", "Внутренняя ошибка сервера")
+    async def handle_server_error(request: Request, _error: Exception) -> JSONResponse:
+        response = error_response(500, "internal_error", "Внутренняя ошибка сервера")
+        # Starlette renders unhandled exceptions outside the CORS middleware.
+        if origins:
+            response.headers.add_vary_header("Origin")
+            origin = request.headers.get("origin")
+            if origin in origins:
+                response.headers["Access-Control-Allow-Origin"] = origin
+        return response
 
     for router in (sessions.router, cars.router, car_items.router):
         app.include_router(router, prefix="/api")

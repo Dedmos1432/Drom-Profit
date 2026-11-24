@@ -2,17 +2,19 @@ from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import (
-    AnyUrl,
-    AwareDatetime,
+    AfterValidator,
     BaseModel,
     BeforeValidator,
     ConfigDict,
     Field,
     StrictBool,
     StrictInt,
+    ValidationError,
     field_validator,
 )
 from typing_extensions import TypedDict
+
+from .formats import validate_timestamp, validate_uri
 
 
 SQLITE_MAX_INTEGER = (1 << 63) - 1
@@ -26,13 +28,20 @@ ExpenseKind = Literal["repair", "maintenance", "missing_equipment", "other"]
 NoteKind = Literal["report", "inspection", "seller", "accepted_defect", "other"]
 
 
-def require_timestamp(value: object) -> object:
-    if isinstance(value, datetime) or (isinstance(value, str) and "T" in value.upper()):
-        return value
-    raise ValueError("Ожидается дата и время в формате RFC 3339")
+def require_nonblank(value: str) -> str:
+    if not value.strip():
+        raise ValueError("Требуется непустой текст")
+    return value
 
 
-Timestamp = Annotated[AwareDatetime, BeforeValidator(require_timestamp)]
+Nonblank = Annotated[Nonempty, AfterValidator(require_nonblank)]
+Uri = Annotated[str, Field(json_schema_extra={"format": "uri"}), AfterValidator(validate_uri)]
+Timestamp = Annotated[
+    str,
+    BeforeValidator(lambda value: value.isoformat() if isinstance(value, datetime) else value),
+    AfterValidator(validate_timestamp),
+    Field(json_schema_extra={"format": "date-time"}),
+]
 
 
 class Schema(BaseModel):
@@ -51,8 +60,8 @@ class ListingFields(Schema):
     transmission: str | None
     drive_type: str | None
     city: str | None
-    image_url: AnyUrl | None
-    listing_url: AnyUrl | None
+    image_url: Uri | None
+    listing_url: Uri | None
     market_valuation: NonnegativeInteger | None
     fetched_at: Timestamp | None
 
@@ -64,8 +73,8 @@ class ListingData(ListingFields):
 
 
 class CarInput(ListingFields):
-    brand: Nonempty
-    model: Nonempty
+    brand: Nonblank
+    model: Nonblank
     price: Price
     listing_id: str | None = None
     year: Year | None = None
@@ -77,8 +86,8 @@ class CarInput(ListingFields):
     transmission: str | None = None
     drive_type: str | None = None
     city: str | None = None
-    image_url: AnyUrl | None = None
-    listing_url: AnyUrl | None = None
+    image_url: Uri | None = None
+    listing_url: Uri | None = None
     market_valuation: NonnegativeInteger | None = None
     fetched_at: Timestamp | None = None
 
@@ -86,8 +95,8 @@ class CarInput(ListingFields):
 class CarPatch(TypedDict, total=False):
     __pydantic_config__ = ConfigDict(extra="forbid")
 
-    brand: Nonempty
-    model: Nonempty
+    brand: Nonblank
+    model: Nonblank
     price: Price
     year: Year | None
     mileage_km: NonnegativeInteger | None
@@ -98,15 +107,15 @@ class CarPatch(TypedDict, total=False):
     transmission: str | None
     drive_type: str | None
     city: str | None
-    image_url: AnyUrl | None
-    listing_url: AnyUrl | None
+    image_url: Uri | None
+    listing_url: Uri | None
     market_valuation: NonnegativeInteger | None
     expenses_reviewed: StrictBool
     benefits_reviewed: StrictBool
 
 
 class BenefitInput(Schema):
-    title: Nonempty
+    title: Nonblank
     amount: NonnegativeInteger | None
     factor_key: str | None = None
     comment: str | None = None
@@ -119,7 +128,7 @@ class ExpenseInput(BenefitInput):
 class BenefitPatch(TypedDict, total=False):
     __pydantic_config__ = ConfigDict(extra="forbid")
 
-    title: Nonempty
+    title: Nonblank
     amount: NonnegativeInteger | None
     factor_key: str | None
     comment: str | None
@@ -130,12 +139,14 @@ class ExpensePatch(BenefitPatch, total=False):
 
 
 class Benefit(BenefitInput):
+    title: Nonempty
     id: str
     factor_key: str | None
     comment: str | None
 
 
 class Expense(ExpenseInput):
+    title: Nonempty
     id: str
     factor_key: str | None
     comment: str | None
@@ -143,17 +154,18 @@ class Expense(ExpenseInput):
 
 class NoteInput(Schema):
     kind: NoteKind
-    text: Nonempty
+    text: Nonblank
 
 
 class NotePatch(TypedDict, total=False):
     __pydantic_config__ = ConfigDict(extra="forbid")
 
     kind: NoteKind
-    text: Nonempty
+    text: Nonblank
 
 
 class Note(NoteInput):
+    text: Nonempty
     id: str
 
 
@@ -167,6 +179,15 @@ class Car(ListingFields):
     expenses: list[Expense]
     benefits: list[Benefit]
     notes: list[Note]
+
+    @field_validator("listing_url", "image_url", mode="wrap")
+    @classmethod
+    def read_existing_uri(cls, value, handler):
+        # Older releases could persist malformed URIs. These optional links are unavailable.
+        try:
+            return handler(value)
+        except ValidationError:
+            return None
 
 
 class Session(Schema):

@@ -7,6 +7,7 @@ from sqlalchemy import select
 from .. import schemas
 from ..db import Database
 from ..errors import APIError, not_found
+from ..formats import validate_uri
 from ..models import Car
 from ..services.calculation import compare, summarize
 from ..services.listing_import import ListingImportError
@@ -29,6 +30,11 @@ async def preview_listing(
     body: schemas.ImportRequest, request: Request, db: Database, _owner: Owner
 ) -> schemas.ListingData:
     db.rollback()
+    try:
+        validate_uri(body.url)
+    except ValueError:
+        status, message = IMPORT_ERRORS["invalid_url"]
+        raise APIError(status, "invalid_url", message) from None
     try:
         return await request.app.state.import_listing(body.url)
     except ListingImportError as error:
