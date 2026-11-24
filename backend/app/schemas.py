@@ -17,10 +17,10 @@ from typing_extensions import TypedDict
 from .formats import validate_timestamp, validate_uri
 
 
-SQLITE_MAX_INTEGER = (1 << 63) - 1
-Price = Annotated[StrictInt, Field(ge=1, le=SQLITE_MAX_INTEGER)]
-NonnegativeInteger = Annotated[StrictInt, Field(ge=0, le=SQLITE_MAX_INTEGER)]
-Year = Annotated[StrictInt, Field(ge=1886, le=SQLITE_MAX_INTEGER)]
+MAX_INT64 = (1 << 63) - 1
+Price = Annotated[StrictInt, Field(ge=1, le=MAX_INT64)]
+NonnegativeInteger = Annotated[StrictInt, Field(ge=0, le=MAX_INT64)]
+Year = Annotated[StrictInt, Field(ge=1886, le=MAX_INT64)]
 EngineVolume = Annotated[float, Field(strict=True, ge=0, allow_inf_nan=False)]
 Nonempty = Annotated[str, Field(min_length=1)]
 Source = Literal["drom", "demo", "manual"]

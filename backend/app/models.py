@@ -1,11 +1,11 @@
 from uuid import uuid4
 
-from sqlalchemy import CheckConstraint, ForeignKey, String, UniqueConstraint
+from sqlalchemy import BigInteger, CheckConstraint, Double, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
-    pass
+    type_annotation_map = {int: BigInteger(), float: Double()}
 
 
 class UserSession(Base):
@@ -68,7 +68,7 @@ class Expense(MonetaryFactor, Base):
     __tablename__ = "expenses"
     __table_args__ = (
         CheckConstraint("amount >= 0"),
-        UniqueConstraint("car_id", "kind", "factor_key"),
+        UniqueConstraint("car_id", "kind", "factor_key", name="uq_expenses_car_kind_key"),
     )
 
     kind: Mapped[str]
@@ -78,7 +78,7 @@ class Benefit(MonetaryFactor, Base):
     __tablename__ = "benefits"
     __table_args__ = (
         CheckConstraint("amount >= 0"),
-        UniqueConstraint("car_id", "factor_key"),
+        UniqueConstraint("car_id", "factor_key", name="uq_benefits_car_key"),
     )
 
 

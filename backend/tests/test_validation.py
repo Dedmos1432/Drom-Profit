@@ -1,6 +1,5 @@
-import sqlite3
-
 import pytest
+from sqlalchemy import text
 from fastapi.testclient import TestClient
 
 from app.main import create_app
@@ -48,11 +47,11 @@ def test_wire_formats(client, headers, field, bad, good):
     assert client.get(path, headers=headers).json()[field] == good
 
 
-def test_invalid_import_uri_is_rejected_before_provider(db_path):
+def test_invalid_import_uri_is_rejected_before_provider(db_url):
     async def unexpected(_url):
         pytest.fail("Provider received an invalid URI")
 
-    with TestClient(create_app(db_path, importer=unexpected)) as client:
+    with TestClient(create_app(db_url, importer=unexpected)) as client:
         token = client.post("/api/session").json()["token"]
         response = client.post("/api/cars/import", headers={"Authorization": "Bearer " + token},
                                json={"url": "https://example.invalid/%xx"})
@@ -60,14 +59,14 @@ def test_invalid_import_uri_is_rejected_before_provider(db_path):
         assert response.json()["code"] == "invalid_url"
 
 
-def test_cors_on_unhandled_errors(db_path, monkeypatch):
+def test_cors_on_unhandled_errors(db_url, monkeypatch):
     allowed = "http://localhost:5173"
     monkeypatch.setenv("DROM_CORS_ORIGINS", allowed)
 
     async def failing_provider(_url):
         raise RuntimeError("provider failed")
 
-    with TestClient(create_app(db_path, importer=failing_provider), raise_server_exceptions=False) as client:
+    with TestClient(create_app(db_url, importer=failing_provider), raise_server_exceptions=False) as client:
         token = client.post("/api/session").json()["token"]
         for origin in (allowed, "https://other.invalid"):
             response = client.post("/api/cars/import", json={"url": "urn:test:car"},
@@ -78,12 +77,12 @@ def test_cors_on_unhandled_errors(db_path, monkeypatch):
             assert response.headers.get("access-control-allow-origin") == (allowed if origin == allowed else None)
 
 
-def test_previously_accepted_card_can_be_read_and_corrected(client, headers, new_car, db_path):
+def test_previously_accepted_card_can_be_read_and_corrected(client, headers, new_car, sql_engine):
     path = new_car()
-    with sqlite3.connect(db_path) as connection:
+    with sql_engine.begin() as connection:
         connection.execute(
-            "UPDATE cars SET brand = ?, listing_url = ? WHERE id = ?",
-            (" ", "https://example.invalid/%xx", path.rsplit("/", 1)[1]),
+            text("UPDATE cars SET brand = :brand, listing_url = :url WHERE id = :id"),
+            dict(brand=" ", url="https://example.invalid/%xx", id=path.rsplit("/", 1)[1]),
         )
     saved = client.get(path, headers=headers)
     assert saved.status_code == 200 and saved.json()["brand"] == " "

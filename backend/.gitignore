@@ -1,4 +1,13 @@
-/.venv/
-/*.sqlite3*
-__pycache__/
+.venv/
+venv/
+**/__pycache__/
 .pytest_cache/
+*.sqlite
+*.sqlite3*
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*
+!.env.example
+/HANDOFF.md

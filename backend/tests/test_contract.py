@@ -6,7 +6,7 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.testclient import TestClient
 
 from app.main import create_app
-from app.schemas import Error, SQLITE_MAX_INTEGER
+from app.schemas import Error, MAX_INT64
 from app.services.listing_import import ListingImportError
 
 
@@ -36,14 +36,18 @@ def field_contract(field):
     }
 
 
-def test_swagger_and_runtime_match_shared_contract(client):
+def test_swagger_serves_shared_contract(client):
     contract = yaml.safe_load(CONTRACT_PATH.read_text("utf-8"))
     response = client.get("/openapi.json")
     assert response.status_code == 200 and response.json() == contract
     docs = client.get("/docs")
     assert docs.status_code == 200 and "/openapi.json" in docs.text
 
-    app = client.app
+
+
+def test_runtime_routes_match_shared_contract():
+    contract = yaml.safe_load(CONTRACT_PATH.read_text("utf-8"))
+    app = create_app()
     actual = get_openapi(title=app.title, version=app.version, routes=app.routes)
     assert actual["paths"].keys() == contract["paths"].keys()
     assert actual["components"]["securitySchemes"] == contract["components"]["securitySchemes"]
@@ -70,7 +74,7 @@ def test_swagger_and_runtime_match_shared_contract(client):
             assert field_contract(schema["properties"][field]) == field_contract(expected), (name, field)
 
 
-@pytest.mark.parametrize("price", [None, 0, -1, 1.5, 2.0, True, "1000", SQLITE_MAX_INTEGER + 1])
+@pytest.mark.parametrize("price", [None, 0, -1, 1.5, 2.0, True, "1000", MAX_INT64 + 1])
 def test_rejects_invalid_price(client, headers, price):
     response = client.post(
         "/api/cars", headers=headers,
@@ -86,7 +90,7 @@ def test_rejects_invalid_price(client, headers, price):
     "collection,params",
     [("expenses", {"kind": "repair"}), ("benefits", {})],
 )
-@pytest.mark.parametrize("amount", [-1, 3.1, 4.0, False, "0", SQLITE_MAX_INTEGER + 1])
+@pytest.mark.parametrize("amount", [-1, 3.1, 4.0, False, "0", MAX_INT64 + 1])
 def test_rejects_invalid_factor_money(client, headers, new_car, collection, params, amount):
     path = new_car() + "/" + collection
     for body in [{"title": "Фактор"} | params, {"title": "Фактор", "amount": amount} | params]:
@@ -117,14 +121,14 @@ def test_patch_rejects_nonnullable_unknown_and_immutable_fields(client, headers,
 
 
 def test_large_money_totals_remain_exact(client, headers, new_car):
-    path = new_car(price=SQLITE_MAX_INTEGER)
+    path = new_car(price=MAX_INT64)
     expense = client.post(
         f"{path}/expenses", headers=headers,
-        json={"title": "Ремонт", "kind": "repair", "amount": SQLITE_MAX_INTEGER},
+        json={"title": "Ремонт", "kind": "repair", "amount": MAX_INT64},
     )
     assert expense.status_code == 201
     result = client.get(f"{path}/summary", headers=headers).json()
-    assert result["acquisition_cost"] == result["adjusted_cost"] == 2 * SQLITE_MAX_INTEGER
+    assert result["acquisition_cost"] == result["adjusted_cost"] == 2 * MAX_INT64
 
 
 @pytest.mark.parametrize("ids", [[], ["a"], ["a", "a"], [1, "a"]])
@@ -165,11 +169,11 @@ def test_demo_preview_errors(client, headers, url, status, code):
 
 
 @pytest.mark.parametrize("code,status", [("source_forbidden", 403), ("parse_error", 502), ("source_unavailable", 503)])
-def test_importer_can_be_injected(db_path, code, status):
+def test_importer_can_be_injected(db_url, code, status):
     async def import_listing(_url):
         raise ListingImportError(code)
 
-    with TestClient(create_app(db_path, importer=import_listing)) as client:
+    with TestClient(create_app(db_url, importer=import_listing)) as client:
         token = client.post("/api/session").json()["token"]
         response = client.post(
             "/api/cars/import",

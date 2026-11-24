@@ -1,11 +1,10 @@
-from typing import Annotated
-
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Request, Response
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.orm import Session
 
 from .. import schemas
-from ..db import Database
+from ..db import Database, Snapshot
 from ..errors import APIError, not_found
 from ..formats import validate_uri
 from ..models import Car
@@ -27,9 +26,8 @@ IMPORT_ERRORS = {
 
 @router.post("/cars/import")
 async def preview_listing(
-    body: schemas.ImportRequest, request: Request, db: Database, _owner: Owner
+    body: schemas.ImportRequest, request: Request, _owner: Owner
 ) -> schemas.ListingData:
-    db.rollback()
     try:
         validate_uri(body.url)
     except ValueError:
@@ -53,28 +51,30 @@ def create_car(body: schemas.CarInput, db: Database, owner: Owner) -> schemas.Ca
 
 
 @router.get("/cars")
-def list_cars(db: Database, owner: Owner) -> list[schemas.Car]:
+def list_cars(db: Snapshot, owner: Owner) -> list[schemas.Car]:
     cars = db.scalars(select(Car).where(Car.session_id == owner).order_by(Car.id))
     return [schemas.Car.model_validate(car) for car in cars]
 
 
-def require_car(car_id: str, db: Database, owner: Owner) -> Car:
-    car = db.scalar(select(Car).where(Car.id == car_id, Car.session_id == owner))
+def require_car(car_id: str, db: Session, owner: str, *, lock: bool = False) -> Car:
+    query = select(Car).where(Car.id == car_id, Car.session_id == owner)
+    if lock:
+        db.execute(text("SET LOCAL lock_timeout = '3s'"))
+        query = query.with_for_update(of=Car)
+    car = db.scalar(query)
     if car is None:
         raise not_found()
     return car
 
 
-OwnedCar = Annotated[Car, Depends(require_car)]
-
-
 @router.get("/cars/{car_id}")
-def get_car(car: OwnedCar) -> schemas.Car:
-    return schemas.Car.model_validate(car)
+def get_car(car_id: str, db: Snapshot, owner: Owner) -> schemas.Car:
+    return schemas.Car.model_validate(require_car(car_id, db, owner))
 
 
 @router.patch("/cars/{car_id}")
-def patch_car(body: schemas.CarPatch, car: OwnedCar, db: Database) -> schemas.Car:
+def patch_car(body: schemas.CarPatch, car_id: str, db: Database, owner: Owner) -> schemas.Car:
+    car = require_car(car_id, db, owner, lock=True)
     reviewed_fields = ("expenses_reviewed", "benefits_reviewed")
     changes = jsonable_encoder(body)
     flags = {field: changes.pop(field) for field in reviewed_fields if field in changes}
@@ -88,19 +88,20 @@ def patch_car(body: schemas.CarPatch, car: OwnedCar, db: Database) -> schemas.Ca
 
 
 @router.delete("/cars/{car_id}", status_code=204)
-def delete_car(car: OwnedCar, db: Database) -> Response:
+def delete_car(car_id: str, db: Database, owner: Owner) -> Response:
+    car = require_car(car_id, db, owner, lock=True)
     db.delete(car)
     db.commit()
     return Response(status_code=204)
 
 
 @router.get("/cars/{car_id}/summary")
-def car_summary(car: OwnedCar) -> schemas.Summary:
-    return summarize(car)
+def car_summary(car_id: str, db: Snapshot, owner: Owner) -> schemas.Summary:
+    return summarize(require_car(car_id, db, owner))
 
 
 @router.post("/comparison")
-def comparison(body: schemas.ComparisonRequest, db: Database, owner: Owner) -> schemas.Comparison:
+def comparison(body: schemas.ComparisonRequest, db: Snapshot, owner: Owner) -> schemas.Comparison:
     cars = db.scalars(
         select(Car).where(Car.session_id == owner, Car.id.in_(body.car_ids))
     )

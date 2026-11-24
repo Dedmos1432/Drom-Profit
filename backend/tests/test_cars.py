@@ -1,8 +1,8 @@
 from concurrent.futures import ThreadPoolExecutor
 from hashlib import sha256
-from sqlite3 import connect
 
 import pytest
+from sqlalchemy import text
 from fastapi.testclient import TestClient
 
 from app.main import create_app
@@ -78,8 +78,8 @@ def test_requires_valid_bearer(client, authorization):
     assert set(response.json()) == {"code", "message"}
 
 
-def test_persistence_and_cascade(db_path):
-    with TestClient(create_app(db_path)) as client:
+def test_persistence_and_cascade(db_url, sql_engine):
+    with TestClient(create_app(db_url)) as client:
         token = client.post("/api/session").json()["token"]
         headers = {"Authorization": f"Bearer {token}"}
         car = client.post(
@@ -90,19 +90,19 @@ def test_persistence_and_cascade(db_path):
         for collection, body, _ in ITEMS:
             assert client.post(f"{path}/{collection}", headers=headers, json=body).status_code == 201
 
-    with connect(db_path) as connection:
-        assert connection.execute("SELECT token_hash FROM sessions").fetchone() == (
+    with sql_engine.connect() as connection:
+        assert connection.execute(text("SELECT token_hash FROM sessions")).fetchone() == (
             sha256(token.encode()).hexdigest(),
         )
-    with TestClient(create_app(db_path)) as restarted:
+    with TestClient(create_app(db_url)) as restarted:
         saved = restarted.get(path, headers=headers).json()
         for collection, _, _ in ITEMS:
             assert len(saved[collection]) == 1
         assert restarted.delete(path, headers=headers).status_code == 204
         assert restarted.get(path, headers=headers).status_code == 404
-    with connect(db_path) as connection:
+    with sql_engine.connect() as connection:
         for collection, _, _ in ITEMS:
-            assert connection.execute(f"SELECT COUNT(*) FROM {collection}").fetchone() == (0,)
+            assert connection.execute(text(f"SELECT COUNT(*) FROM {collection}")).fetchone() == (0,)
 
 
 def test_explicit_review_and_editing_flags(client, headers, new_car):

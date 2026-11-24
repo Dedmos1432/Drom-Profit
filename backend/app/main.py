@@ -7,12 +7,13 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import URL, text
+from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException
 
 from .api import car_items, cars, sessions
 from .db import make_engine
 from .errors import APIError
-from .models import Base
 from .schemas import Error
 from .services.listing_import import ListingImporter, make_demo_importer
 
@@ -27,25 +28,28 @@ def error_response(status: int, code: str, message: str, headers=None) -> JSONRe
     )
 
 
-def create_app(db_path: Path | None = None, importer: ListingImporter | None = None) -> FastAPI:
-    if db_path is None:
-        db_path = Path(environ.get("DROM_DB_PATH", str(BACKEND / "drom-profit.sqlite3")))
-    db_path = db_path.resolve()
+def create_app(db_url: str | URL | None = None, importer: ListingImporter | None = None) -> FastAPI:
     contract = yaml.safe_load((SHARED / "openapi.yaml").read_text("utf-8"))
     if importer is None:
         importer = make_demo_importer(SHARED / "fixtures" / "import-listings.json")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        engine = make_engine(db_path)
+        engine = make_engine(db_url)
         app.state.engine = engine
+        app.state.snapshot_engine = engine.execution_options(
+            isolation_level="REPEATABLE READ", postgresql_readonly=True,
+        )
+
+        def check_schema():
+            with engine.connect() as connection:
+                connection.execute(text("SELECT id FROM sessions LIMIT 0"))
+
         try:
-            with engine.begin() as connection:
-                connection.exec_driver_sql("BEGIN IMMEDIATE")
-                Base.metadata.create_all(connection)
+            await run_in_threadpool(check_schema)
             yield
         finally:
-            engine.dispose()
+            await run_in_threadpool(engine.dispose)
 
     app = FastAPI(
         title=contract["info"]["title"], version=contract["info"]["version"], lifespan=lifespan

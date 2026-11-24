@@ -2,12 +2,12 @@ from hashlib import sha256
 from secrets import token_urlsafe
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 
 from .. import schemas
-from ..db import Database
+from ..db import Database, session_for
 from ..errors import APIError
 from ..models import UserSession
 
@@ -30,13 +30,14 @@ def create_session(response: Response, db: Database) -> schemas.Session:
 
 
 def require_session(
-    db: Database,
+    request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
 ) -> str:
     if credentials is not None:
-        session_id = db.scalar(
-            select(UserSession.id).where(UserSession.token_hash == token_hash(credentials.credentials))
-        )
+        with session_for(request.app.state.engine) as db:
+            session_id = db.scalar(
+                select(UserSession.id).where(UserSession.token_hash == token_hash(credentials.credentials))
+            )
         if session_id is not None:
             return session_id
     raise APIError(

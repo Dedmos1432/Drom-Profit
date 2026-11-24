@@ -8,7 +8,8 @@ from ..db import Database
 from ..errors import APIError, not_found
 from ..models import Benefit, Car, Expense, Note
 from ..services.calculation import missing_equipment_keys
-from .cars import OwnedCar
+from .cars import require_car
+from .sessions import Owner
 
 
 router = APIRouter(prefix="/cars/{car_id}")
@@ -70,55 +71,64 @@ def remove_item(db: Session, car: Car, item: Expense | Benefit | Note) -> Respon
 
 
 @router.post("/expenses", status_code=201)
-def create_expense(body: schemas.ExpenseInput, car: OwnedCar, db: Database) -> schemas.Expense:
+def create_expense(body: schemas.ExpenseInput, car_id: str, db: Database, owner: Owner) -> schemas.Expense:
+    car = require_car(car_id, db, owner, lock=True)
     expense = add_item(db, car, car.expenses, Expense(**body.model_dump()))
     return schemas.Expense.model_validate(expense)
 
 
 @router.patch("/expenses/{item_id}")
 def patch_expense(
-    item_id: str, body: schemas.ExpensePatch, car: OwnedCar, db: Database
+    item_id: str, body: schemas.ExpensePatch, car_id: str, db: Database, owner: Owner
 ) -> schemas.Expense:
+    car = require_car(car_id, db, owner, lock=True)
     expense = update_item(db, car, require_item(car.expenses, item_id), body)
     return schemas.Expense.model_validate(expense)
 
 
 @router.delete("/expenses/{item_id}", status_code=204)
-def delete_expense(item_id: str, car: OwnedCar, db: Database) -> Response:
+def delete_expense(item_id: str, car_id: str, db: Database, owner: Owner) -> Response:
+    car = require_car(car_id, db, owner, lock=True)
     return remove_item(db, car, require_item(car.expenses, item_id))
 
 
 @router.post("/benefits", status_code=201)
-def create_benefit(body: schemas.BenefitInput, car: OwnedCar, db: Database) -> schemas.Benefit:
+def create_benefit(body: schemas.BenefitInput, car_id: str, db: Database, owner: Owner) -> schemas.Benefit:
+    car = require_car(car_id, db, owner, lock=True)
     benefit = add_item(db, car, car.benefits, Benefit(**body.model_dump()))
     return schemas.Benefit.model_validate(benefit)
 
 
 @router.patch("/benefits/{item_id}")
 def patch_benefit(
-    item_id: str, body: schemas.BenefitPatch, car: OwnedCar, db: Database
+    item_id: str, body: schemas.BenefitPatch, car_id: str, db: Database, owner: Owner
 ) -> schemas.Benefit:
+    car = require_car(car_id, db, owner, lock=True)
     benefit = update_item(db, car, require_item(car.benefits, item_id), body)
     return schemas.Benefit.model_validate(benefit)
 
 
 @router.delete("/benefits/{item_id}", status_code=204)
-def delete_benefit(item_id: str, car: OwnedCar, db: Database) -> Response:
+def delete_benefit(item_id: str, car_id: str, db: Database, owner: Owner) -> Response:
+    car = require_car(car_id, db, owner, lock=True)
     return remove_item(db, car, require_item(car.benefits, item_id))
 
 
 @router.post("/notes", status_code=201)
-def create_note(body: schemas.NoteInput, car: OwnedCar, db: Database) -> schemas.Note:
+def create_note(body: schemas.NoteInput, car_id: str, db: Database, owner: Owner) -> schemas.Note:
+    car = require_car(car_id, db, owner, lock=True)
     note = add_item(db, car, car.notes, Note(**body.model_dump()))
     return schemas.Note.model_validate(note)
 
 
 @router.patch("/notes/{item_id}")
-def patch_note(item_id: str, body: schemas.NotePatch, car: OwnedCar, db: Database) -> schemas.Note:
+def patch_note(item_id: str, body: schemas.NotePatch, car_id: str, db: Database, owner: Owner) -> schemas.Note:
+    car = require_car(car_id, db, owner, lock=True)
     note = update_item(db, car, require_item(car.notes, item_id), body)
     return schemas.Note.model_validate(note)
 
 
 @router.delete("/notes/{item_id}", status_code=204)
-def delete_note(item_id: str, car: OwnedCar, db: Database) -> Response:
+def delete_note(item_id: str, car_id: str, db: Database, owner: Owner) -> Response:
+    car = require_car(car_id, db, owner, lock=True)
     return remove_item(db, car, require_item(car.notes, item_id))

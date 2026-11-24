@@ -1,44 +1,73 @@
-import sqlite3
 from collections.abc import Iterator
-from pathlib import Path
+from contextlib import contextmanager
+from os import environ
 from typing import Annotated
 
 from fastapi import Depends, Request
-from sqlalchemy import Engine, URL, create_engine, event
-from sqlalchemy.exc import OperationalError
+from sqlalchemy import Engine, URL, create_engine, make_url
+from sqlalchemy.exc import DBAPIError, TimeoutError as PoolTimeout
 from sqlalchemy.orm import Session
 
 from .errors import APIError
 
 
-def make_engine(path: Path) -> Engine:
-    engine = create_engine(URL.create("sqlite+pysqlite", database=str(path)), hide_parameters=True)
+def database_url(value: str | URL | None = None) -> URL:
+    if value is None:
+        value = environ.get("DROM_DATABASE_URL")
+    if not value:
+        raise ValueError("Задайте DROM_DATABASE_URL")
+    url = make_url(value)
+    if url.drivername != "postgresql+psycopg":
+        raise ValueError("Требуется URL postgresql+psycopg")
+    return url
 
-    @event.listens_for(engine, "connect")
-    def configure_sqlite(connection, _record):
-        connection.isolation_level = None
-        connection.execute("PRAGMA foreign_keys = ON")
 
-    return engine
+def make_engine(value: str | URL | None = None) -> Engine:
+    size = int(environ.get("DROM_DB_POOL_SIZE", "10"))
+    overflow = int(environ.get("DROM_DB_MAX_OVERFLOW", "5"))
+    if size < 1 or overflow < 0:
+        raise ValueError("Пул требует pool_size >= 1 и max_overflow >= 0")
+    return create_engine(
+        database_url(value), isolation_level="READ COMMITTED", pool_pre_ping=True,
+        pool_size=size, max_overflow=overflow, pool_timeout=5,
+        connect_args={"connect_timeout": 5}, hide_parameters=True,
+    )
+
+
+@contextmanager
+def session_for(engine: Engine) -> Iterator[Session]:
+    # Closing the session rolls back an unfinished transaction before pool check-in.
+    try:
+        with Session(engine, expire_on_commit=False) as session:
+            yield session
+    except PoolTimeout as error:
+        raise APIError(500, "internal_error", "Нет свободного соединения с базой данных") from error
+    except DBAPIError as error:
+        state = getattr(error.orig, "sqlstate", None)
+        if state in {"57P03", "53300"}:
+            raise APIError(500, "internal_error", "База данных временно недоступна") from error
+        if state == "55P03":
+            raise APIError(500, "internal_error", "База данных временно занята. Повторите запрос") from error
+        if state in {"40001", "40P01"}:
+            raise APIError(500, "internal_error", "Транзакция отменена из-за конфликта изменений") from error
+        if state == "23505" and getattr(error.orig.diag, "constraint_name", None) in {
+            "uq_expenses_car_kind_key", "uq_benefits_car_key",
+        }:
+            raise APIError(422, "duplicate_factor", "Этот фактор уже добавлен в карточку") from error
+        # Includes unexpected integrity errors and connection failures, including
+        # a lost connection during COMMIT for which the outcome is unknown.
+        raise
 
 
 def get_db(request: Request) -> Iterator[Session]:
-    read_only = request.scope["route"].name in {"comparison", "preview_listing"}
-    write = request.method in {"POST", "PATCH", "DELETE"} and not read_only
-    with Session(request.app.state.engine, expire_on_commit=False) as session:
-        # Acquire the SQLite write lock before reading data used to validate a change.
-        try:
-            session.connection().exec_driver_sql("BEGIN IMMEDIATE" if write else "BEGIN")
-            yield session
-        except OperationalError as error:
-            code = getattr(error.orig, "sqlite_errorcode", 0)
-            if code & 0xff != sqlite3.SQLITE_BUSY:
-                raise
-            # A failed SQLite COMMIT can leave the physical transaction open.
-            session.invalidate()
-            raise APIError(
-                500, "internal_error", "База данных временно занята. Повторите запрос"
-            ) from error
+    with session_for(request.app.state.engine) as session:
+        yield session
 
 
-Database = Annotated[Session, Depends(get_db)]
+def get_snapshot(request: Request) -> Iterator[Session]:
+    with session_for(request.app.state.snapshot_engine) as session:
+        yield session
+
+
+Database = Annotated[Session, Depends(get_db, scope="function")]
+Snapshot = Annotated[Session, Depends(get_snapshot, scope="function")]
