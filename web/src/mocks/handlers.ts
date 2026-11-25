@@ -7,6 +7,7 @@ import { apiUrl } from '@/shared/api/client';
 import type { components } from '@/shared/api/schema';
 import type { AppConfig } from '@/shared/config/env';
 import { comparisonRequestSchema, fixtureComparison } from './comparison';
+import { findShowcaseListing } from './showcase';
 import { createMockStore } from './store';
 import { fixtureSummary } from './summary';
 import { vehicleWriteHandlers } from './vehicle-writes';
@@ -98,7 +99,9 @@ export function handlers(config: AppConfig, storage: Storage, locks?: LockManage
       const lookup = new URL(parsed.data).href;
       const failure = failures.get(lookup);
       if (failure) return failure();
-      const listing = (listings as Listing[]).find((item) => item.listing_url === lookup);
+      const listing =
+        (listings as Listing[]).find((item) => item.listing_url === lookup) ??
+        findShowcaseListing(lookup, config.baseUrl);
       return listing ? response(listing) : unavailable();
     }),
     http.post(url('/api/cars'), async ({ request }) => {

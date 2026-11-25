@@ -17,6 +17,7 @@ function readIds(key: string) {
 type Selection = {
   ids: readonly string[];
   select: (id: string, checked: boolean) => void;
+  selectAll: (available: readonly string[]) => void;
   clear: () => void;
   retain: (ids: readonly string[]) => void;
 };
@@ -50,6 +51,7 @@ function StoredSelection({ storageKey }: { storageKey: string }) {
       value={{
         ids,
         select,
+        selectAll: (available) => update([...new Set(available)]),
         clear: () => update([]),
         retain: (available) => update(latest.current.filter((id) => available.includes(id))),
       }}

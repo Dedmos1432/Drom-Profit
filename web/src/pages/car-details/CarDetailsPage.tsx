@@ -1,15 +1,17 @@
 import { Link as RouterLink, useLocation, useParams } from 'react-router';
 import { useEffect, useState } from 'react';
+import { useSession } from '@/entities/session/SessionBoundary';
 import { useCar, useCarSummary } from '@/entities/vehicle/api';
 import type { Car } from '@/entities/vehicle/api';
 import {
   engine,
   mileage,
   originalListing,
+  sourceLabel,
   vehicleName,
-  vehicleSourceLabel,
 } from '@/entities/vehicle/presentation';
-import { VehiclePhoto } from '@/entities/vehicle/VehiclePhoto';
+import { vehicleGalleryImages } from '@/entities/vehicle/showcase-photos';
+import { VehicleGallery } from '@/entities/vehicle/VehicleGallery';
 import { EditVehicleDialog } from '@/features/edit-vehicle/EditVehicleDialog';
 import { ApiError } from '@/shared/api/client';
 import {
@@ -90,10 +92,12 @@ function VehicleDetails({
   retry: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const { config } = useSession();
   const summary = useCarSummary(car.id);
   const { hash } = useLocation();
   const name = vehicleName(car);
   const original = originalListing(car);
+  const images = vehicleGalleryImages(car, config.mode === 'mock' ? config.baseUrl : undefined);
 
   useEffect(() => {
     const target = hash.slice(1);
@@ -122,20 +126,19 @@ function VehicleDetails({
         />
       )}
       <div className={styles.details}>
-        <VehiclePhoto value={car.image_url} />
+        <VehicleGallery images={images} modelPhotos={images.length > 1} />
         <Stack className={styles.description} gap="roomy">
           <Stack gap="tight">
             <PageHeader title={name} />
-            <Badge tone={car.source === 'demo' ? 'info' : 'neutral'}>
-              {vehicleSourceLabel[car.source]}
-            </Badge>
+            <Badge tone={car.source === 'demo' ? 'info' : 'neutral'}>{sourceLabel(car)}</Badge>
             <div>
               <p className={styles.muted}>Цена объявления</p>
-              <Price size="display" value={car.price} />
+              <Price size="display" value={car.price} wrapGroups />
             </div>
             {car.market_valuation !== null && (
               <p>
-                Рыночная оценка Дрома <Price size="compact" value={car.market_valuation} />
+                Рыночная оценка Дрома{' '}
+                <Price size="compact" value={car.market_valuation} wrapGroups />
               </p>
             )}
           </Stack>
@@ -150,7 +153,6 @@ function VehicleDetails({
                 { label: 'Привод', value: car.drive_type },
                 { label: 'Город продажи', value: car.city },
                 { label: 'Комплектация', value: car.trim },
-                { label: 'Источник', value: vehicleSourceLabel[car.source] },
               ]}
             />
           </section>
@@ -165,7 +167,7 @@ function VehicleDetails({
             <Button variant="outline" onClick={() => setEditing(true)}>
               Редактировать характеристики
             </Button>
-            <Link href="#financial-summary">К саммари</Link>
+            <Link href="#financial-summary">К экономической оценке</Link>
           </Inline>
         </Stack>
       </div>
@@ -175,14 +177,12 @@ function VehicleDetails({
             car={car}
             group="expenses"
             summary={summary.current}
-            summaryUpdating={summary.updating}
             reviewAvailable={reviewAvailable}
           />
           <MoneyFactorsSection
             car={car}
             group="benefits"
             summary={summary.current}
-            summaryUpdating={summary.updating}
             reviewAvailable={reviewAvailable}
           />
           <NotesSection car={car} />

@@ -25,7 +25,7 @@ const showcases = [
 export default function UiKitPage() {
   return (
     <div className={styles.page}>
-      <PageHeader title="UI Kit" description="Компоненты и дизайн-токены Drom Profit." />
+      <PageHeader title="UI Kit" description="Компоненты и дизайн-токены «Дром Профит»." />
       <div className={styles.guide}>
         <nav className={styles.index} aria-label="Разделы UI Kit">
           <ul>

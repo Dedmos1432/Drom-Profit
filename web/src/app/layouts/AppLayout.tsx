@@ -28,7 +28,7 @@ export function AppLayout() {
         ref={main}
         className={classes(styles.main, pathname !== '/ui-kit' && styles.productMain)}
       >
-        <Container>
+        <Container wide={pathname !== '/ui-kit'}>
           <Outlet />
         </Container>
       </main>

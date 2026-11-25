@@ -6,6 +6,7 @@ import { vehicleApi, vehicleKeys } from '@/entities/vehicle/api';
 import type { Car } from '@/entities/vehicle/api';
 import { vehicleName } from '@/entities/vehicle/presentation';
 import { Button, ConfirmDialog } from '@/shared/ui';
+import styles from './DeleteVehicleButton.module.css';
 
 export function DeleteVehicleButton({
   car,
@@ -34,7 +35,12 @@ export function DeleteVehicleButton({
 
   return (
     <>
-      <Button variant="ghost" onClick={() => setOpen(true)}>
+      <Button
+        variant="danger"
+        className={styles.trigger}
+        disabled={removal.isPending}
+        onClick={() => setOpen(true)}
+      >
         Удалить
       </Button>
       <ConfirmDialog

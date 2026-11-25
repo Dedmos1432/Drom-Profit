@@ -152,6 +152,8 @@
     "choiceMark": { "$type": "dimension", "$value": "22px" },
     "thumbnailAspect": { "$type": "ratio", "$value": "4 / 3" },
     "listingThumb": { "$type": "dimension", "$value": "160px" },
+    "listingPhotoMin": { "$type": "dimension", "$value": "220px" },
+    "listingPhotoMax": { "$type": "dimension", "$value": "260px" },
     "compactThumb": { "$type": "dimension", "$value": "96px" }
   },
   "radius": {
@@ -173,12 +175,14 @@
   },
   "layout": {
     "containerMax": { "$type": "dimension", "$value": "1120px" },
+    "productMax": { "$type": "dimension", "$value": "1460px" },
     "formMax": { "$type": "dimension", "$value": "640px" },
     "dialogMax": { "$type": "dimension", "$value": "480px" },
     "gutterCompact": { "$type": "dimension", "$value": "16px" },
     "gutterMedium": { "$type": "dimension", "$value": "{spacing.roomy}" },
     "gutterWide": { "$type": "dimension", "$value": "32px" },
     "detailColumns": { "$type": "gridTemplate", "$value": "minmax(0, 3fr) minmax(300px, 2fr)" },
+    "workspaceColumns": { "$type": "gridTemplate", "$value": "minmax(0, 1fr) minmax(340px, 440px)" },
     "comparisonLabelMin": { "$type": "dimension", "$value": "136px" },
     "comparisonVehicleMin": { "$type": "dimension", "$value": "152px" }
   },

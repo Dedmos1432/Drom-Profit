@@ -1,8 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import type { ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { listingUrlSchema } from '@/entities/vehicle/validation';
 import { ApiError } from '@/shared/api/client';
+import { classes } from '@/shared/lib/classes';
 import { Button, Input } from '@/shared/ui';
 import styles from './ListingLinkForm.module.css';
 
@@ -28,9 +30,10 @@ type Props = {
   initialUrl?: string;
   busy?: boolean;
   quick?: boolean;
+  secondaryAction?: ReactNode;
 };
 
-export function ListingLinkForm({ onSubmit, initialUrl = '', busy, quick }: Props) {
+export function ListingLinkForm({ onSubmit, initialUrl = '', busy, quick, secondaryAction }: Props) {
   const {
     handleSubmit,
     register,
@@ -41,7 +44,11 @@ export function ListingLinkForm({ onSubmit, initialUrl = '', busy, quick }: Prop
   });
 
   return (
-    <form noValidate className={styles.form} onSubmit={handleSubmit(({ url }) => onSubmit(url))}>
+    <form
+      noValidate
+      className={classes(styles.form, secondaryAction ? styles.withSecondary : undefined)}
+      onSubmit={handleSubmit(({ url }) => onSubmit(url))}
+    >
       <Input
         {...register('url')}
         type="url"
@@ -52,8 +59,9 @@ export function ListingLinkForm({ onSubmit, initialUrl = '', busy, quick }: Prop
         error={errors.url?.message}
       />
       <Button type="submit" variant={quick ? 'contrast' : 'primary'} loading={busy}>
-        {quick ? 'Добавить' : busy ? 'Получаем данные…' : 'Получить данные'}
+        {quick ? 'Добавить по ссылке' : busy ? 'Получаем данные…' : 'Получить данные'}
       </Button>
+      {secondaryAction}
     </form>
   );
 }

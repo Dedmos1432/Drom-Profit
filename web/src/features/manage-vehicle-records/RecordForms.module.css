@@ -10,3 +10,12 @@
 .actions {
   margin-block-start: var(--dp-spacing-row);
 }
+.match summary {
+  color: var(--dp-color-semantic-text-link);
+  cursor: pointer;
+  padding-block: var(--dp-spacing-tiny);
+}
+
+.match[open] summary {
+  margin-block-end: var(--dp-spacing-small);
+}

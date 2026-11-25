@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
 import { useSession } from '@/entities/session/SessionBoundary';
 import { useCars } from '@/entities/vehicle/api';
 import { ListingLinkForm } from '@/features/import-vehicle/ListingLinkForm';
@@ -32,37 +32,50 @@ export function SelectionPage() {
   const cars = useCars();
   const selection = useComparisonSelection();
   const selected = new Set(selection.ids);
-  const selectedCount = cars.data?.filter(({ id }) => selected.has(id)).length ?? 0;
+  const availableIds = cars.data?.map(({ id }) => id) ?? [];
+  const selectedCount = availableIds.filter((id) => selected.has(id)).length;
 
   return (
     <Stack gap="roomy">
       <PageHeader
         title="Моя выборка"
-        description="Соберите автомобили, которые рассматриваете, чтобы оценить вложения и сравнить варианты."
-        actions={<Button onClick={() => navigate('/cars/new')}>Добавить автомобиль</Button>}
+        description="Добавьте автомобили, оцените расходы и преимущества, затем сравните варианты."
       />
       <section aria-label="Быстрое добавление" className={styles.quick}>
-        <Stack gap="tight">
-          <ListingLinkForm
-            quick
-            onSubmit={(listingUrl) => navigate('/cars/new', { state: { listingUrl } })}
-          />
-          <div>
-            <Link to="/cars/new?method=manual">Добавить вручную</Link>
-          </div>
-        </Stack>
+        <ListingLinkForm
+          quick
+          onSubmit={(listingUrl) => navigate('/cars/new', { state: { listingUrl } })}
+          secondaryAction={
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => navigate('/cars/new?method=manual')}
+            >
+              Добавить вручную
+            </Button>
+          }
+        />
       </section>
       <section aria-labelledby="saved-cars" className={styles.list}>
         <div className={styles.listHeader}>
           <Inline gap="tight">
             <h2 id="saved-cars">Сохранённые автомобили</h2>
             {cars.data && <span className={styles.count}>{savedCount(cars.data.length)}</span>}
-            {config.scenario === 'seeded' && <Badge tone="info">Демонстрационная выборка</Badge>}
+            {(config.scenario === 'seeded' || config.scenario === 'showcase') && (
+              <Badge tone="info">Демонстрационная выборка</Badge>
+            )}
           </Inline>
           {cars.data && cars.data.length > 0 && (
             <Inline gap="tight">
+              <Button
+                variant="ghost"
+                disabled={selectedCount === cars.data.length}
+                onClick={() => selection.selectAll(availableIds)}
+              >
+                Выбрать все
+              </Button>
               <span className={styles.count} role="status">
-                Выбрано {selectedCount}
+                Выбрано {selectedCount} из {cars.data.length}
               </span>
               <Button
                 variant="outline"

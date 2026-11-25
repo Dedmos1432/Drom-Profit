@@ -110,6 +110,8 @@
   --dp-sizing-choice-mark: 22px;
   --dp-sizing-thumbnail-aspect: 4 / 3;
   --dp-sizing-listing-thumb: 160px;
+  --dp-sizing-listing-photo-min: 220px;
+  --dp-sizing-listing-photo-max: 260px;
   --dp-sizing-compact-thumb: 96px;
   --dp-radius-mark: 6px;
   --dp-radius-control: 12px;
@@ -123,12 +125,14 @@
   --dp-shadow-flat: none;
   --dp-shadow-overlay: 0 6px 20px rgba(27, 42, 85, 0.12);
   --dp-layout-container-max: 1120px;
+  --dp-layout-product-max: 1460px;
   --dp-layout-form-max: 640px;
   --dp-layout-dialog-max: 480px;
   --dp-layout-gutter-compact: 16px;
   --dp-layout-gutter-medium: var(--dp-spacing-roomy);
   --dp-layout-gutter-wide: 32px;
   --dp-layout-detail-columns: minmax(0, 3fr) minmax(300px, 2fr);
+  --dp-layout-workspace-columns: minmax(0, 1fr) minmax(340px, 440px);
   --dp-layout-comparison-label-min: 136px;
   --dp-layout-comparison-vehicle-min: 152px;
   --dp-breakpoint-medium: 600px;

@@ -1,6 +1,23 @@
 import fixtures from '../../../shared/fixtures/demo-cars.json';
 import type { Car, CarInput } from '@/entities/vehicle/api';
 import type { AppConfig } from '@/shared/config/env';
+import { demoPhotoUrl } from '@/entities/vehicle/showcase-photos';
+import { showcaseCars } from './showcase';
+
+const seedPhotos: Record<string, string> = {
+  'car-1': 'camry-xv50-silver.jpg',
+  'car-2': 'camry-xv50-white.jpg',
+  'car-3': 'camry-xv50-silver.jpg',
+};
+
+function seededCars(baseUrl: string): Car[] {
+  return (fixtures as Car[]).map((car) => {
+    const photo = seedPhotos[car.id];
+    return photo && car.source === 'demo' && car.image_url === null
+      ? { ...car, image_url: demoPhotoUrl(photo, baseUrl) }
+      : car;
+  });
+}
 
 export function createMockStore(
   storage: Pick<Storage, 'getItem' | 'setItem'>,
@@ -34,7 +51,13 @@ export function createMockStore(
   return {
     createSession() {
       const token = 'drom-demo-' + crypto.randomUUID();
-      save(token, config.scenario === 'seeded' ? (fixtures as Car[]) : []);
+      const cars =
+        config.scenario === 'showcase'
+          ? showcaseCars(config.baseUrl)
+          : config.scenario === 'seeded'
+            ? seededCars(config.baseUrl)
+            : [];
+      save(token, cars);
       return token;
     },
     list,

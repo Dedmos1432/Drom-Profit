@@ -4,17 +4,30 @@ import { ImagePlaceholder } from '@/shared/ui';
 import { safeWebUrl } from './presentation';
 import styles from './VehiclePhoto.module.css';
 
-export function VehiclePhoto({ value, className }: { value: string | null; className?: string }) {
+export function VehiclePhoto({
+  value,
+  className,
+  alt = '',
+  onUnavailable,
+}: {
+  value: string | null;
+  className?: string;
+  alt?: string;
+  onUnavailable?: (url: string) => void;
+}) {
   const url = safeWebUrl(value);
   const [failed, setFailed] = useState<string | null>(null);
 
   return url && failed !== url ? (
     <img
       className={classes(styles.photo, className)}
-      alt=""
+      alt={alt}
       src={url}
       loading="lazy"
-      onError={() => setFailed(url)}
+      onError={() => {
+        setFailed(url);
+        onUnavailable?.(url);
+      }}
     />
   ) : (
     <ImagePlaceholder data-photo-placeholder="" className={classes(styles.photo, className)} />

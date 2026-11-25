@@ -20,13 +20,11 @@ export function MoneyFactorsSection({
   car,
   group,
   summary,
-  summaryUpdating,
   reviewAvailable,
 }: {
   car: Car;
   group: 'expenses' | 'benefits';
   summary?: Summary;
-  summaryUpdating: boolean;
   reviewAvailable: boolean;
 }) {
   const expense = group === 'expenses';
@@ -35,9 +33,8 @@ export function MoneyFactorsSection({
   const addLabel = expense ? 'Добавить расход' : 'Добавить преимущество';
   const reviewKey = expense ? 'expenses_reviewed' : 'benefits_reviewed';
   const reviewed = car[reviewKey];
-  const reviewLabel = expense ? 'Подтвердить расходы' : 'Подтвердить преимущества';
+  const reviewLabel = expense ? 'Все расходы учтены' : 'Все преимущества учтены';
   const knownTotal = expense ? summary?.total_expenses : summary?.total_benefits;
-  const unknown = expense ? summary?.unknown_expenses : summary?.unknown_benefits;
   const [editing, setEditing] = useState<{ item: Factor | null } | null>(null);
   const [removing, setRemoving] = useState<Factor | null>(null);
   const change = useRecordMutation(car.id, group);
@@ -73,13 +70,11 @@ export function MoneyFactorsSection({
             {addLabel}
           </Button>
         </div>
-        {!expense && (
-          <p className={styles.muted}>
-            Укажите, сколько оснащение значит лично для вас. Рыночная стоимость и сумма к оплате от
-            этого не меняются. Учитывайте одно оснащение одним способом — как вложение или как
-            преимущество.
-          </p>
-        )}
+        <p className={styles.muted}>
+          {expense
+            ? 'Запишите, во сколько обойдутся ремонт, обслуживание и недостающее оснащение.'
+            : 'Укажите, сколько дополнительное оснащение стоит лично для вас. Учитывайте его один раз — как вложение или преимущество.'}
+        </p>
         {items.length === 0 ? (
           <p className={styles.muted}>
             {reviewAvailable && reviewed
@@ -98,14 +93,12 @@ export function MoneyFactorsSection({
                   <strong>{item.title}</strong>
                   {'kind' in item && <p className={styles.muted}>{expenseLabels[item.kind]}</p>}
                   {item.comment && <p className={styles.entryText}>{item.comment}</p>}
-                  {item.factor_key && (
-                    <p className={styles.muted}>Ключ оснащения · {item.factor_key}</p>
-                  )}
                 </div>
                 <Price
                   size="compact"
                   className={styles.amount}
                   value={item.amount}
+                  wrapGroups
                   unknownLabel={expense ? 'Стоимость неизвестна' : 'Ценность неизвестна'}
                 />
                 <div className={styles.rowActions}>
@@ -117,28 +110,26 @@ export function MoneyFactorsSection({
         )}
         <div className={styles.review}>
           <Stack gap="tight">
-            {knownTotal === undefined ? (
-              <p className={styles.muted}>
-                {summaryUpdating ? 'Обновляем итоги…' : 'Итог недоступен.'}
-              </p>
-            ) : (
+            {knownTotal !== undefined && (
               <div className={styles.reviewLine}>
-                <span>{expense ? 'Сумма известных расходов' : 'Сумма известных преимуществ'}</span>
-                <Price value={knownTotal} />
-                <span className={styles.muted}>Неизвестных сумм · {unknown}</span>
+                <span>{expense ? 'Учтённые вложения' : 'Учтённая ценность преимуществ'}</span>
+                <Price value={knownTotal} wrapGroups />
               </div>
+            )}
+            {reviewAvailable && !reviewed && (
+              <p className={styles.muted}>
+                {items.length
+                  ? 'Отметьте, что рассмотрели весь список. Неизвестные суммы можно уточнить позже.'
+                  : 'Если добавлять нечего, отметьте это для оценки.'}
+              </p>
             )}
             <div className={styles.reviewLine}>
               {reviewAvailable ? (
-                <Badge tone={reviewed ? 'success' : 'warning'}>
-                  {expense
-                    ? reviewed
-                      ? 'Расходы подтверждены'
-                      : 'Расходы не подтверждены'
-                    : reviewed
-                      ? 'Преимущества подтверждены'
-                      : 'Преимущества не подтверждены'}
-                </Badge>
+                reviewed && (
+                  <Badge tone="success">
+                    {expense ? 'Расходы рассмотрены' : 'Преимущества рассмотрены'}
+                  </Badge>
+                )
               ) : (
                 <p className={styles.muted}>Подтверждение уточняется…</p>
               )}
@@ -150,13 +141,13 @@ export function MoneyFactorsSection({
               >
                 {reviewed
                   ? expense
-                    ? 'Снять подтверждение расходов'
-                    : 'Снять подтверждение преимуществ'
+                    ? 'Пересмотреть расходы'
+                    : 'Пересмотреть преимущества'
                   : items.length > 0
                     ? reviewLabel
                     : expense
-                      ? 'Подтвердить отсутствие расходов'
-                      : 'Подтвердить отсутствие преимуществ'}
+                      ? 'Расходов нет'
+                      : 'Преимуществ нет'}
               </Button>
             </div>
             {review.isError && (

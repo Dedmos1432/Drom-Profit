@@ -4,13 +4,21 @@
   max-inline-size: var(--dp-layout-form-max);
 }
 
+.withSecondary {
+  max-inline-size: none;
+}
+
 @media (min-width: 600px) {
   .form {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;
   }
 
-  .form button {
+  .form > button {
     margin-block-start: calc(var(--dp-typography-line-height-body) + var(--dp-spacing-tiny));
+  }
+
+  .withSecondary {
+    grid-template-columns: minmax(0, 1fr) auto auto;
   }
 }

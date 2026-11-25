@@ -1,4 +1,5 @@
 import type { Car, useCarSummary } from '@/entities/vehicle/api';
+import { assessmentLabel } from '@/entities/vehicle/presentation';
 import { Alert, Badge, Button, ErrorState, Price, Spinner, Stack } from '@/shared/ui';
 import styles from './FinancialSummary.module.css';
 
@@ -13,12 +14,11 @@ export function FinancialSummary({
   summary: SummaryView;
   reviewAvailable: boolean;
 }) {
-  const { current, updating, retry } = summary;
+  const { current, updating, issue, paused, retry } = summary;
   const complete = current?.assessment_status === 'complete';
   const reasons = [
-    reviewAvailable && !car.expenses_reviewed ? 'Расходы не подтверждены.' : null,
-    reviewAvailable && !car.benefits_reviewed ? 'Преимущества не подтверждены.' : null,
-    current?.unknown_expenses || current?.unknown_benefits ? 'Есть неизвестные суммы.' : null,
+    reviewAvailable && !car.expenses_reviewed ? 'Отметьте, что рассмотрели расходы.' : null,
+    reviewAvailable && !car.benefits_reviewed ? 'Отметьте, что рассмотрели преимущества.' : null,
   ].filter(Boolean);
 
   return (
@@ -29,75 +29,101 @@ export function FinancialSummary({
       className={styles.summary}
     >
       <Stack gap="tight">
-        <h2 id="financial-summary-title">Экономическое саммари</h2>
+        <h2 id="financial-summary-title">Экономическая оценка</h2>
         <div className={styles.status}>
           {updating ? (
-            <Spinner size="small" label="Обновляем саммари…" />
+            <Spinner size="small" label="Обновляем оценку…" />
           ) : current ? (
             <Badge tone={complete ? 'success' : 'warning'}>
-              {complete ? 'Оценка полная' : 'Оценка предварительная'}
+              {assessmentLabel[current.assessment_status]}
             </Badge>
           ) : null}
         </div>
-        {!updating && !current && (
+        {!updating && issue && (
           <ErrorState
-            title="Не удалось загрузить саммари"
-            description="Повторите запрос, чтобы увидеть актуальные суммы."
+            title={paused ? 'Загрузка оценки приостановлена' : 'Не удалось загрузить оценку'}
+            description={issue}
             action={
-              <Button variant="secondary" onClick={() => void retry()}>
-                Повторить загрузку
-              </Button>
+              !paused && (
+                <Button variant="secondary" onClick={() => void retry({ cancelRefetch: false })}>
+                  Повторить загрузку
+                </Button>
+              )
             }
           />
+        )}
+        {current && !complete && (
+          <p className={styles.hint}>Учтены только известные суммы. {reasons.join(' ')}</p>
         )}
         <dl className={styles.numbers} aria-busy={updating}>
           <div className={styles.line}>
             <dt>Цена объявления</dt>
             <dd>
-              <Price size="compact" value={current?.listing_price ?? null} unknownLabel="—" />
+              <Price
+                size="compact"
+                value={current?.listing_price ?? null}
+                unknownLabel="—"
+                wrapGroups
+              />
             </dd>
           </div>
           <div className={styles.line}>
-            <dt>Известные вложения</dt>
+            <dt>Учтённые вложения</dt>
             <dd>
-              <Price size="compact" value={current?.total_expenses ?? null} unknownLabel="—" />
+              <Price
+                size="compact"
+                value={current?.total_expenses ?? null}
+                unknownLabel="—"
+                wrapGroups
+              />
             </dd>
           </div>
           <div className={styles.major}>
             <dt>Предполагаемые затраты на приобретение</dt>
             <dd>
-              <Price size="display" value={current?.acquisition_cost ?? null} unknownLabel="—" />
+              <Price
+                size="display"
+                value={current?.acquisition_cost ?? null}
+                unknownLabel="—"
+                wrapGroups
+              />
             </dd>
           </div>
           <div className={styles.line}>
-            <dt>Известная персональная ценность преимуществ</dt>
+            <dt>Ценность преимуществ</dt>
             <dd>
-              <Price size="compact" value={current?.total_benefits ?? null} unknownLabel="—" />
+              <Price
+                size="compact"
+                value={current?.total_benefits ?? null}
+                unknownLabel="—"
+                wrapGroups
+              />
             </dd>
           </div>
           <div className={styles.major}>
             <dt>Скорректированная стоимость</dt>
             <dd>
-              <Price size="display" value={current?.adjusted_cost ?? null} unknownLabel="—" />
+              <Price
+                size="display"
+                value={current?.adjusted_cost ?? null}
+                unknownLabel="—"
+                wrapGroups
+              />
             </dd>
-            <dd className={styles.hint}>Условный показатель для сравнения автомобилей.</dd>
+            <dd className={styles.hint}>Учитывает вашу оценку преимуществ при сравнении.</dd>
           </div>
-          {current && (
+          {current && (current.unknown_expenses > 0 || current.unknown_benefits > 0) && (
             <div className={styles.line}>
               <dt>Неизвестные суммы</dt>
               <dd className={styles.counts}>
-                Расходы · {current.unknown_expenses}
-                <br />
-                Преимущества · {current.unknown_benefits}
+                {current.unknown_expenses > 0 && <div>Расходы · {current.unknown_expenses}</div>}
+                {current.unknown_benefits > 0 && (
+                  <div>Преимущества · {current.unknown_benefits}</div>
+                )}
               </dd>
             </div>
           )}
         </dl>
-        {current && !complete && (
-          <Alert tone="warning" title="Результат предварительный">
-            Учтены только указанные суммы. {reasons.join(' ')}
-          </Alert>
-        )}
         {current && current.adjusted_cost < 0 && (
           <Alert tone="warning" title="Скорректированная стоимость ниже нуля">
             Проверьте персональную ценность указанных преимуществ.

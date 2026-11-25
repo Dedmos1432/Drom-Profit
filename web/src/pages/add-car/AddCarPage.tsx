@@ -4,12 +4,13 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useSession } from '@/entities/session/SessionBoundary';
 import { vehicleApi } from '@/entities/vehicle/api';
 import type { CarInput, Listing } from '@/entities/vehicle/api';
+import { sourceLabel } from '@/entities/vehicle/presentation';
 import { listingUrlSchema } from '@/entities/vehicle/validation';
 import { VehiclePhoto } from '@/entities/vehicle/VehiclePhoto';
 import { VehicleForm } from '@/features/add-vehicle/VehicleForm';
 import { useSaveVehicle } from '@/features/add-vehicle/useSaveVehicle';
 import { importErrorMessage, ListingLinkForm } from '@/features/import-vehicle/ListingLinkForm';
-import { Alert, Badge, Breadcrumbs, Inline, PageHeader, Radio, Stack } from '@/shared/ui';
+import { Alert, Badge, Breadcrumbs, Button, Inline, PageHeader, Radio, Stack } from '@/shared/ui';
 import styles from './AddCarPage.module.css';
 
 export function AddCarPage() {
@@ -125,11 +126,11 @@ export function AddCarPage() {
                   {importErrorMessage(error)}
                 </Alert>
               )}
-              {!save.isPending && (
+              {isError && (
                 <div>
-                  <Link to="/cars/new?method=manual" onClick={() => save.reset()}>
+                  <Button variant="secondary" onClick={() => selectMode('manual')}>
                     Ввести данные вручную
-                  </Link>
+                  </Button>
                 </div>
               )}
             </Stack>
@@ -139,7 +140,9 @@ export function AddCarPage() {
               <Stack>
                 <Inline gap="tight">
                   <h2 id="preview-title">Предпросмотр автомобиля</h2>
-                  {preview.listing.source === 'demo' && <Badge tone="info">Демо-источник</Badge>}
+                  {preview.listing.source === 'demo' && (
+                    <Badge tone="info">{sourceLabel(preview.listing)}</Badge>
+                  )}
                 </Inline>
                 <p className={styles.hint}>
                   {preview.listing.source === 'demo'

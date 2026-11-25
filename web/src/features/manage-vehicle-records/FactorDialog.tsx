@@ -104,12 +104,15 @@ export function FactorDialog({
               label={expense ? 'Стоимость пока неизвестна' : 'Ценность пока неизвестна'}
             />
           </Stack>
-          <Input
-            {...form.register('factor_key')}
-            label="Ключ оснащения (необязательно)"
-            helperText="Для одинакового оснащения используйте один ключ, например winter_tires."
-          />
           <Textarea {...form.register('comment')} label="Комментарий (необязательно)" rows={2} />
+          <details className={styles.match}>
+            <summary>Связать одинаковое оснащение</summary>
+            <Input
+              {...form.register('factor_key')}
+              label="Обозначение оснащения (необязательно)"
+              helperText="Используйте одно и то же обозначение для одинакового оснащения. Если обозначение уже есть в другой записи, скопируйте его оттуда."
+            />
+          </details>
         </fieldset>
         {error && (
           <Alert tone="error" title="Не удалось сохранить запись" role="alert">

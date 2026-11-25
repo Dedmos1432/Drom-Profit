@@ -2,6 +2,7 @@ import { setupServer } from 'msw/node';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { vehiclePath } from '@/entities/vehicle/api';
 import type { Car, Listing } from '@/entities/vehicle/api';
+import type { Comparison } from '@/entities/comparison/api';
 import { updateRecord } from '@/entities/vehicle/records';
 import type { Benefit, Expense, Note } from '@/entities/vehicle/records';
 import { createApiClient } from '@/shared/api/client';
@@ -25,6 +26,63 @@ async function openSession() {
   });
   return createApiClient({ baseUrl: config.baseUrl, getToken: () => token });
 }
+
+it('uses the same five models for showcase and editable imports while keeping assessments separate', async () => {
+  const showcase = { ...config, scenario: 'showcase' } as const;
+  server.resetHandlers(...handlers(showcase, localStorage));
+  const api = await openSession();
+  const cars = await api.request<Car[]>('/api/cars');
+  const models = ['Toyota Camry', 'Honda Accord', 'Mazda 6', 'Nissan X-Trail', 'Toyota RAV4'];
+  expect(cars.map(({ brand, model }) => brand + ' ' + model)).toEqual(models);
+  expect(new Set(cars.map(({ image_url }) => image_url)).size).toBe(5);
+
+  for (const [index, car] of cars.entries()) {
+    const url = 'https://auto.drom.ru/demo/' + (101 + index) + '.html';
+    const listing = await api.request<Listing>('/api/cars/import', {
+      method: 'POST',
+      body: { url },
+    });
+    expect(listing).toEqual(
+      expect.objectContaining({
+        brand: car.brand,
+        model: car.model,
+        year: car.year,
+        price: car.price,
+        mileage_km: car.mileage_km,
+        image_url: car.image_url,
+        listing_url: url,
+      }),
+    );
+    expect(listing.image_url).toContain('/demo/vehicles/');
+    expect(listing).not.toHaveProperty('expenses');
+  }
+  expect(await api.request('/api/cars')).toEqual(cars);
+  const comparison = await api.request<Comparison>('/api/comparison', {
+    method: 'POST',
+    body: { car_ids: cars.map(({ id }) => id) },
+  });
+  expect(comparison.items.map(({ assessment_status }) => assessment_status)).toEqual([
+    'complete',
+    'incomplete',
+    'complete',
+    'incomplete',
+    'complete',
+  ]);
+  expect(comparison.items.map(({ difference_from_min }) => difference_from_min)).toEqual([
+    0, 147_000, 232_000, 353_000, 631_000,
+  ]);
+
+  server.resetHandlers(...handlers({ ...config, scenario: 'seeded' }, localStorage));
+  const seeded = await openSession();
+  expect(await seeded.request('/api/cars')).toHaveLength(3);
+  const legacy = await seeded.request<Listing>('/api/cars/import', {
+    method: 'POST',
+    body: { url: 'https://auto.drom.ru/demo/1.html' },
+  });
+  expect(legacy.model).toBe('Camry');
+  server.resetHandlers(...handlers(showcase, localStorage));
+  expect(await api.request('/api/cars')).toEqual(cars);
+});
 
 it('previews without saving, persists a created car, enforces ownership and deletes it', async () => {
   const owner = await openSession();

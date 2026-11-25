@@ -9,11 +9,15 @@ type FlowProps = DivProps & { gap?: Gap };
 
 export function Container({
   narrow = false,
+  wide = false,
   className,
   ...props
-}: DivProps & { narrow?: boolean }) {
+}: DivProps & { narrow?: boolean; wide?: boolean }) {
   return (
-    <div {...props} className={classes(styles.container, narrow && styles.narrow, className)} />
+    <div
+      {...props}
+      className={classes(styles.container, wide && styles.wide, narrow && styles.narrow, className)}
+    />
   );
 }
 

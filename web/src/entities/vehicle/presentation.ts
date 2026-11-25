@@ -1,4 +1,4 @@
-import type { Car } from './api';
+import type { Car, Summary } from './api';
 
 const number = new Intl.NumberFormat('ru-RU');
 
@@ -6,6 +6,11 @@ export const vehicleSourceLabel: Record<Car['source'], string> = {
   drom: 'Дром',
   demo: 'Демо-источник',
   manual: 'Ручной ввод',
+};
+
+export const assessmentLabel: Record<Summary['assessment_status'], string> = {
+  complete: 'Все данные рассмотрены',
+  incomplete: 'Предварительная оценка',
 };
 
 export function vehicleName(car: Car) {
@@ -34,6 +39,14 @@ export function safeWebUrl(url: string | null) {
   return ['https:', 'http:'].includes(parsed.protocol) && !parsed.username && !parsed.password
     ? parsed.href
     : null;
+}
+
+export function sourceLabel({ source, image_url }: Pick<Car, 'source' | 'image_url'>) {
+  const image = image_url && safeWebUrl(image_url);
+  if (source === 'demo' && image && new URL(image).pathname.includes('/demo/vehicles/')) {
+    return 'Демо · фото модели';
+  }
+  return vehicleSourceLabel[source];
 }
 
 export function originalListing(car: Car) {

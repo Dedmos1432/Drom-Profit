@@ -5,6 +5,11 @@
   padding-inline: var(--dp-page-gutter);
 }
 
+.wide {
+  max-inline-size: var(--dp-layout-product-max);
+  margin-inline: 0 auto;
+}
+
 .narrow {
   max-inline-size: var(--dp-layout-form-max);
 }

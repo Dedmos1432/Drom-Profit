@@ -1,5 +1,4 @@
 import { Link, NavLink } from 'react-router';
-import { Container } from '@/shared/ui';
 import styles from './Header.module.css';
 
 const mainLinks = [
@@ -11,9 +10,9 @@ const mainLinks = [
 export function Header() {
   return (
     <header className={styles.header}>
-      <Container className={styles.row}>
+      <div className={styles.row}>
         <Link to="/" className={styles.brand}>
-          <span>Drom</span> Profit
+          <span>Дром</span> Профит
         </Link>
         <nav aria-label="Основная навигация" className={styles.nav}>
           {mainLinks.map(({ to, label }) => (
@@ -27,7 +26,7 @@ export function Header() {
             </NavLink>
           )}
         </nav>
-      </Container>
+      </div>
     </header>
   );
 }

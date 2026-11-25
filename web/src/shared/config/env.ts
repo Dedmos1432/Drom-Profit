@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const apiMode = z.enum(['mock', 'real']);
 const apiBaseUrl = z.url({ protocol: /^https?$/ });
-const mockScenario = z.enum(['empty', 'seeded', 'list-error']);
+const mockScenario = z.enum(['empty', 'seeded', 'showcase', 'list-error']);
 
 export function readConfig() {
   const mode = apiMode.parse(

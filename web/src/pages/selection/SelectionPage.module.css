@@ -1,4 +1,5 @@
 .quick {
+  max-inline-size: calc(var(--dp-layout-form-max) + var(--dp-sizing-listing-thumb));
   padding: var(--dp-spacing-row);
   border-radius: var(--dp-radius-panel-large);
   background: var(--dp-color-semantic-background-panel);
