@@ -1,7 +1,7 @@
 name: drom-core
 x-postgres: &postgres
   image: postgres:17.6-bookworm
-  pull_policy: ${DROM_POSTGRES_PULL_POLICY:-never}
+  pull_policy: ${DROM_POSTGRES_PULL_POLICY:-missing}
   healthcheck:
     test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U drom -d \"$$POSTGRES_DB\""]
     interval: 3s
@@ -9,7 +9,7 @@ x-postgres: &postgres
     retries: 15
 
 x-app: &app
-  image: drom-core-backend:local
+  image: ${COMPOSE_PROJECT_NAME}-backend:local
   pull_policy: never
   networks: [database]
   environment:
@@ -18,6 +18,7 @@ x-app: &app
     DROM_DB_POOL_SIZE: ${DROM_DB_POOL_SIZE:-10}
     DROM_DB_MAX_OVERFLOW: ${DROM_DB_MAX_OVERFLOW:-5}
     DROM_CORS_ORIGINS: ${DROM_CORS_ORIGINS:-}
+    DROM_LISTINGS_SOURCE: ${DROM_LISTINGS_SOURCE:-demo}
   volumes: &shared
     - type: bind
       source: ../shared
@@ -28,7 +29,7 @@ x-app: &app
 
 x-loopback: &loopback
   image: python:3.14.0-slim-bookworm
-  pull_policy: never
+  pull_policy: missing
   user: "10001:10001"
   read_only: true
   cap_drop: [ALL]
@@ -86,7 +87,7 @@ services:
 
   tests:
     profiles: [test]
-    image: drom-core-tests:local
+    image: ${COMPOSE_PROJECT_NAME}-tests:local
     pull_policy: never
     build:
       context: .
@@ -101,6 +102,7 @@ services:
       DROM_DB_POOL_SIZE: ${DROM_DB_POOL_SIZE:-10}
       DROM_DB_MAX_OVERFLOW: ${DROM_DB_MAX_OVERFLOW:-5}
       DROM_LOAD_ROUNDS: ${DROM_LOAD_ROUNDS:-5}
+      DROM_LISTINGS_SOURCE: demo
     volumes: *shared
 
   api-loopback:

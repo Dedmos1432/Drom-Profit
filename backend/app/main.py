@@ -15,7 +15,7 @@ from .api import car_items, cars, sessions
 from .db import make_engine
 from .errors import APIError
 from .schemas import Error
-from .services.listing_import import ListingImporter, make_demo_importer
+from .services.listing_import import ListingImporter, make_parser_importer
 
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -31,7 +31,7 @@ def error_response(status: int, code: str, message: str, headers=None) -> JSONRe
 def create_app(db_url: str | URL | None = None, importer: ListingImporter | None = None) -> FastAPI:
     contract = yaml.safe_load((SHARED / "openapi.yaml").read_text("utf-8"))
     if importer is None:
-        importer = make_demo_importer(SHARED / "fixtures" / "import-listings.json")
+        importer = make_parser_importer()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):

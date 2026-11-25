@@ -12,6 +12,7 @@
 !tests/
 !tests/**/
 !tests/**/*.py
+!tests/listings/samples/synthetic_listing.html
 **/__pycache__/
 **/.venv/
 **/venv/

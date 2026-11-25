@@ -44,28 +44,30 @@ if (-not (Test-Path -LiteralPath .env)) {
 ### Запуск
 
 ```text
-docker compose up --build -d
-docker compose ps -a
+docker compose -p drom-mvp-integration up --build -d --wait
+docker compose -p drom-mvp-integration ps -a
 ```
 
-При первой сборке Docker использует официальные образы Python и PostgreSQL, pip получает wheels из PyPI. В среде с ограниченным доступом это требует предварительного разрешения. Для запуска уже собранных образов задайте в `.env` значение `DROM_POSTGRES_PULL_POLICY=never` и используйте `docker compose up --no-build --pull never -d`.
+Используйте один и тот же `-p drom-mvp-integration` для запуска, тестов, миграций и остановки. Compose использует это имя для собственных локальных образов и тома. Перед запуском проверьте, что порты 8000 и 55432 свободны. Порт 55433 требуется только для тестов из venv.
 
-Compose запускает PostgreSQL, дожидается его healthcheck и применяет `alembic upgrade head` в одноразовом сервисе `migrate`. Нормальное состояние этого сервиса после миграции — `Exited (0)`. Затем стартует API под UID 10001. Его HTTP-healthcheck проверяет ответ `/openapi.json`, а при старте само приложение проверяет доступ к таблице сессий. Для диагностики используйте `docker compose logs migrate backend`. Контракт и fixtures все сервисы Python читают из `../shared`, смонтированного только для чтения.
+Политика `missing` позволяет Compose получить официальные образы PostgreSQL и Python для TCP-прокси при отсутствии локальной копии. При сборке Backend Docker использует базовый образ Python, а pip получает wheels из PyPI. Для автономного запуска заранее загрузите оба базовых образа и соберите образы проекта, затем выполните `docker compose -p drom-mvp-integration up --no-build --pull never -d --wait`.
+
+Compose запускает PostgreSQL, дожидается его healthcheck и применяет `alembic upgrade head` в одноразовом сервисе `migrate`. Нормальное состояние этого сервиса после миграции — `Exited (0)`. Затем стартует API под UID 10001. Его HTTP-healthcheck проверяет ответ `/openapi.json`, а при старте само приложение проверяет доступ к таблице сессий. Для диагностики используйте `docker compose -p drom-mvp-integration logs migrate backend`. Контракт и fixtures все сервисы Python читают из `../shared`, смонтированного только для чтения.
 
 - REST доступен по [127.0.0.1:8000/api](http://127.0.0.1:8000/api/cars). Для начала работы создайте сессию через `POST /api/session`.
 - [Swagger UI](http://127.0.0.1:8000/docs) и [OpenAPI JSON](http://127.0.0.1:8000/openapi.json) доступны без токена. Стандартный Swagger UI FastAPI загружает ресурсы в браузере с CDN. При запрете внешней сети используйте JSON или локальный YAML.
-- Порты хоста слушают только loopback. Сервисы `api-loopback`, `postgres-loopback` и `postgres-test-loopback` передают TCP в соответствующую внутреннюю сеть. API, PostgreSQL и тесты остаются во внутренних сетях Docker. Фактическую публикацию API показывает `docker compose port api-loopback 8000`. Данные основной БД хранятся в именованном volume.
+- Порты хоста слушают только loopback. Сервисы `api-loopback`, `postgres-loopback` и `postgres-test-loopback` передают TCP в соответствующую внутреннюю сеть. API, PostgreSQL и тесты остаются во внутренних сетях Docker. Фактическую публикацию API показывает `docker compose -p drom-mvp-integration port api-loopback 8000`. Данные основной БД хранятся в именованном volume.
 
 ### Разработка, миграции и остановка
 
 ```text
-docker compose -f compose.yaml -f compose.dev.yaml up --build -d
-docker compose run --rm migrate
-docker compose run --rm migrate python -m alembic check
-docker compose down
+docker compose -p drom-mvp-integration -f compose.yaml -f compose.dev.yaml up --build -d --wait
+docker compose -p drom-mvp-integration run --rm migrate
+docker compose -p drom-mvp-integration run --rm migrate python -m alembic check
+docker compose -p drom-mvp-integration down
 ```
 
-В режиме разработки изменения `app/**/*.py` видны Uvicorn через bind mount с автоперезагрузкой. После изменений зависимостей или миграций пересоберите образ. Обычный `down` сохраняет данные в volume. Для временной остановки достаточно `docker compose stop`.
+В режиме разработки изменения `app/**/*.py` видны Uvicorn через bind mount с автоперезагрузкой. После изменений зависимостей или миграций пересоберите образ. Обычный `down` сохраняет данные в volume. Для временной остановки достаточно `docker compose -p drom-mvp-integration stop`.
 
 ### Настройки
 
@@ -75,6 +77,8 @@ docker compose down
 | `DROM_DATABASE_URL`, `DROM_TEST_DATABASE_URL` | Для запуска с хоста используются loopback-порты 55432 и 55433. Контейнеры получают свои DSN из Compose. |
 | `DROM_DB_POOL_SIZE`, `DROM_DB_MAX_OVERFLOW` | По умолчанию 10 постоянных и 5 дополнительных соединений на процесс. |
 | `DROM_CORS_ORIGINS` | Точные origins Web через запятую, например `http://localhost:5173`. |
+| `DROM_LISTINGS_SOURCE` | В интеграционном Backend используется `demo`. Пустое значение выбирает `demo`. Другие значения завершают запуск с ошибкой конфигурации. |
+| `DROM_LISTINGS_FIXTURE` | При запуске вне Compose можно указать путь к разрешённому локальному JSON. Compose использует общий набор из read-only `../shared`. |
 
 ### Альтернативный запуск через venv
 
@@ -108,7 +112,7 @@ $env:PGPASSWORD = $env:POSTGRES_PASSWORD
 
 ```text
 python -m pip install -r requirements-dev.txt
-docker compose up --pull never -d --wait postgres-loopback
+docker compose -p drom-mvp-integration up --pull never -d --wait postgres-loopback
 python -m alembic upgrade head
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
@@ -134,21 +138,44 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 ## Импортер
 
-При сборке приложения подключите `create_app(importer=import_listing)`. Интерфейс — `async import_listing(url: str) -> ListingData` из `app.schemas`, ошибки — `ListingImportError` из `app.services.listing_import`. Допустимые коды и соответствующие HTTP-статусы заданы в общем контракте. Предпросмотр работает без записи в БД. В режиме по умолчанию используются три синтетических URL из fixtures, сетевые запросы отсутствуют.
+Фабрика приложения создаёт адаптер один раз на экземпляр FastAPI. Штатный Uvicorn создаёт один экземпляр приложения и импортера на процесс. Адаптер вызывает `importer_from_env()`, который загружает три синтетические записи из `shared/fixtures/import-listings.json` при создании. Demo Provider использует локальные данные без HTTP-запросов. В тестах `create_app(importer=...)` по-прежнему принимает асинхронный callable, возвращающий `app.schemas.ListingData`. [Фабрика приложения](app/main.py) · [Адаптер](app/services/listing_import.py)
+
+Маршрут проверяет тело и Bearer. Авторизация возвращает соединение PostgreSQL в пул до ожидания импортера. Адаптер преобразует неизменяемый dataclass через `ListingData.model_validate(data.as_dict())`. Предпросмотр доступен по `POST /api/cars/import`. Для записи используйте отдельный `POST /api/cars` с отредактированными данными. [Маршрут](app/api/cars.py) · [Авторизация](app/api/sessions.py)
+
+| HTTP | Код | Условие |
+|---|---|---|
+| 400 | `invalid_url` | Строка URL не проходит проверку Core или Parser. |
+| 401 | `unauthorized` | Bearer отсутствует или недействителен. |
+| 403 | `source_forbidden` | Источник запретил доступ. |
+| 404 | `listing_unavailable` | В demo-наборе отсутствует объявление с допустимым URL. |
+| 422 | `validation_error` | Ошибка структуры запроса. |
+| 502 | `parse_error` | Ошибка разбора либо результат не проходит валидацию Core. |
+| 503 | `source_unavailable` | Ошибка доступности источника. |
+
+Ответ ошибки содержит `code` и пользовательское `message`. Неожиданные исключения обрабатываются существующим обработчиком `500 internal_error`. В demo-режиме доступны `https://auto.drom.ru/demo/1.html`, `/demo/2.html` и `/demo/3.html` на том же хосте. Parser приводит регистр хоста к нижнему и отбрасывает query и fragment. Он требует HTTPS, точный хост и путь объявления с `.html`. Явные порты и учётные данные в URL отклоняются.
+
+Публичная модель передаёт одно nullable-поле `image_url`. У всех трёх общих demo-записей оно равно `null`. Реальный источник требует отдельного согласования. Вопросы галереи, точности денег, `factor_key` и пула PostgreSQL перечислены в [интеграционном бэклоге](../docs/INTEGRATION_BACKLOG.md).
+
+## Подключение Web на этапе 8.3
+
+1. В локальном окружении Backend задайте `DROM_CORS_ORIGINS=http://localhost:5173` или точный origin вашего Web. Запустите Backend командой выше.
+2. В рабочем дереве Web установите `VITE_API_MODE=real` и `VITE_API_BASE_URL=http://127.0.0.1:8000`. Выполните `npm ci` и `npm run dev` из каталога `web/`.
+3. Проверьте анонимную сессию, предпросмотры `/demo/1.html`–`/demo/3.html`, редактирование, сохранение, восстановление сессии, расходы, преимущества, заметки, Summary, Comparison и ошибки. Ссылки витрины `101–105` обслуживает Web Mock до согласования серверного демонабора.
 
 ## Тесты
 
 Тестовый контейнер использует сетевой namespace отдельного `postgres-test` и подключается к `drom_profit_test` по loopback. Каждый тест мигрирует собственную временную схему. Для запуска pytest из venv запустите сервис `postgres-test-loopback`, который публикует тестовую БД на порту 55433 хоста. Для первого запуска тестового образа нужна согласованная сборка.
 
 ```text
-docker compose --profile test build tests
-docker compose --profile test up --pull never -d --wait postgres-test
-docker compose --profile test run --rm tests
-# После успешного функционального прогона
-docker compose --profile test run --rm tests python -m pytest -q -s -p no:cacheprovider tests/load_postgres.py
-docker compose --profile test stop postgres-test
+docker compose -p drom-mvp-integration --profile test build tests
+docker compose -p drom-mvp-integration --profile test up -d --wait postgres-test
+docker compose -p drom-mvp-integration --profile test run --rm --no-deps tests python -m pytest --collect-only -q -p no:cacheprovider
+docker compose -p drom-mvp-integration --profile test run --rm --no-deps tests
+docker compose -p drom-mvp-integration --profile test run --rm --no-deps tests python -m pytest -q -p no:cacheprovider tests/listings/test_listings_http_worker.py
+docker compose -p drom-mvp-integration --profile test run --rm --no-deps tests python -m pytest -q -s -p no:cacheprovider tests/load_postgres.py -k 'not 100'
+docker compose -p drom-mvp-integration --profile test stop postgres-test
 ```
 
-При запуске через venv загрузите окружение из раздела выше, выполните `docker compose --profile test up --pull never -d --wait postgres-test-loopback`, затем `python -m pytest -q` и `python -m pytest -q -s tests/load_postgres.py`.
+Единый прогон собирает тесты Core, `tests/listings` и `tests/test_listing_integration.py`. Общий `conftest.py` использует `socket.AF_UNIX`. Для полного прогона на Windows используйте Linux-контейнеры. Отдельные тесты Parser могут запускаться без PostgreSQL в его исходном Python-окружении.
 
 Нагрузка поднимает Uvicorn внутри тестового контейнера. Сценарии используют 1, 10, 50 и 100 конкурентных пользователей, по умолчанию по 5 циклов и 9 запросов за цикл. JSON-отчет содержит среднее время ответа, медиану, P95, P99, RPS, успешность, ошибки, конфликты и параметры среды. Для другого числа циклов задайте `DROM_LOAD_ROUNDS`.

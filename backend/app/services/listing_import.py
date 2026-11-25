@@ -1,15 +1,15 @@
-import json
 from collections.abc import Awaitable, Callable
-from pathlib import Path
-from typing import Literal
-from urllib.parse import urlsplit
+from os import environ
+
+from pydantic import ValidationError
 
 from ..schemas import ListingData
+from .listings import ImportErrorCode
+from .listings import ListingData as ParserListingData
+from .listings import ListingImportError as ParserImportError
+from .listings import importer_from_env
 
 
-ImportErrorCode = Literal[
-    "invalid_url", "listing_unavailable", "source_unavailable", "source_forbidden", "parse_error"
-]
 ListingImporter = Callable[[str], Awaitable[ListingData]]
 
 
@@ -19,29 +19,22 @@ class ListingImportError(Exception):
         self.code = code
 
 
-def make_demo_importer(fixture_path: Path) -> ListingImporter:
-    previews = [ListingData.model_validate(row) for row in json.loads(fixture_path.read_text("utf-8"))]
-    if any(preview.source != "demo" or preview.listing_url is None for preview in previews):
-        raise ValueError("Демонстрационные объявления должны иметь source=demo и URL")
-    by_url = {str(preview.listing_url): preview for preview in previews}
-    allowed_hosts = {urlsplit(url).hostname for url in by_url}
+def make_parser_importer() -> ListingImporter:
+    source = environ.get("DROM_LISTINGS_SOURCE", "demo").strip().lower() or "demo"
+    if source != "demo":
+        raise ValueError("DROM_LISTINGS_SOURCE: Core Backend поддерживает только demo")
+    parser = importer_from_env()
 
     async def import_listing(url: str) -> ListingData:
         try:
-            parts = urlsplit(url)
-            valid = (
-                parts.scheme == "https"
-                and parts.hostname in allowed_hosts
-                and parts.netloc == parts.hostname
-                and parts.port is None
-                and not any(character.isspace() for character in url)
-            )
-        except ValueError:
-            valid = False
-        if not valid:
-            raise ListingImportError("invalid_url")
-        if url not in by_url:
-            raise ListingImportError("listing_unavailable")
-        return by_url[url].model_copy()
+            data = await parser(url)
+        except ParserImportError as error:
+            raise ListingImportError(error.code) from error
+        if not isinstance(data, ParserListingData):
+            raise ListingImportError("parse_error")
+        try:
+            return ListingData.model_validate(data.as_dict())
+        except ValidationError as error:
+            raise ListingImportError("parse_error") from error
 
     return import_listing
