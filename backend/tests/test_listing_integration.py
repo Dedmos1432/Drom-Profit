@@ -140,6 +140,22 @@ def test_unexpected_parser_exception_remains_internal_error(db_url, monkeypatch)
     assert "private parser detail" not in response.text
 
 
+def test_missing_preview_price_must_be_filled_before_save(db_url):
+    async def parser(_url):
+        return ParserListingData(source="demo", brand="Demo", model="Test", market_valuation=0)
+
+    with TestClient(create_app(db_url, importer=listing_import.adapt_parser(parser))) as client:
+        headers = session_headers(client)
+        preview = client.post(PREVIEW, headers=headers, json={"url": DEMO_URL})
+        assert preview.status_code == 200
+        data = preview.json()
+        assert data["price"] is None and data["market_valuation"] is None
+        assert_error(client.post(CARS, headers=headers, json=data), 422, "validation_error")
+        assert client.get(CARS, headers=headers).json() == []
+        saved = client.post(CARS, headers=headers, json=data | {"price": 10})
+        assert saved.status_code == 201 and saved.json()["price"] == 10
+
+
 def test_parser_created_once_per_application(monkeypatch):
     monkeypatch.delenv("DROM_LISTINGS_SOURCE", raising=False)
     original_factory = listing_import.importer_from_env

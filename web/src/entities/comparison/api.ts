@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { useSession } from '@/entities/session/SessionBoundary';
 import { summarySchema } from '@/entities/vehicle/api';
 import { ApiError } from '@/shared/api/client';
+import { comparisonDifference } from '@/shared/api/money';
 import type { paths } from '@/shared/api/schema';
 import { comparisonKeys } from './keys';
 
@@ -13,7 +14,7 @@ export type ComparisonItem = Comparison['items'][number];
 export type ComparisonWarning = Comparison['warnings'][number];
 
 const comparisonSchema = z.object({
-  items: z.array(summarySchema.extend({ difference_from_min: z.int().nonnegative().nullable() })),
+  items: z.array(summarySchema.extend({ difference_from_min: comparisonDifference.nullable() })),
   warnings: z.array(
     z.object({
       code: z.enum(['incomplete', 'double_count', 'negative_adjusted_cost']),
@@ -35,6 +36,7 @@ export function useComparison(ids: string[], enabled: boolean) {
         method: 'POST',
         body,
         signal,
+        money: true,
       });
       const parsed = comparisonSchema.safeParse(payload);
       if (!parsed.success) {

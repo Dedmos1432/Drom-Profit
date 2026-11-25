@@ -14,6 +14,7 @@ from starlette.exceptions import HTTPException
 from .api import car_items, cars, sessions
 from .db import make_engine
 from .errors import APIError
+from .money import MONEY_INPUT_FIELDS, MONEY_RANGE_MESSAGE
 from .schemas import Error
 from .services.listing_import import ListingImporter, make_parser_importer
 
@@ -80,6 +81,15 @@ def create_app(db_url: str | URL | None = None, importer: ListingImporter | None
     async def handle_validation_error(
         _request: Request, _error: RequestValidationError
     ) -> JSONResponse:
+        errors = _error.errors()
+        if errors and all(
+            entry["type"] in {"greater_than_equal", "less_than_equal"}
+            and len(entry["loc"]) == 2
+            and entry["loc"][0] == "body"
+            and entry["loc"][1] in MONEY_INPUT_FIELDS
+            for entry in errors
+        ):
+            return error_response(422, "amount_out_of_range", MONEY_RANGE_MESSAGE)
         return error_response(422, "validation_error", "Проверьте поля запроса")
 
     @app.exception_handler(Exception)

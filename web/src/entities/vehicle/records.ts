@@ -1,5 +1,6 @@
 import type { components } from '@/shared/api/schema';
-import { vehiclePath } from './api';
+import { factorMoney } from '@/shared/api/money';
+import { checkedMoneyResponse, vehiclePath } from './api';
 import type { VehicleClient } from './api';
 
 type Schemas = components['schemas'];
@@ -30,12 +31,16 @@ export async function updateRecord<K extends Collection>(
   change: RecordChange<K>,
 ) {
   const path = `${vehiclePath(id)}/${collection}` as const;
-  if (change.action === 'create') {
-    return api.request<Entries[K]>(path, { method: 'POST', body: change.body });
-  }
-  const itemPath = `${path}/${encodeURIComponent(change.itemId)}` as const;
+  const money = collection !== 'notes';
+  const itemPath =
+    change.action === 'create' ? path : (`${path}/${encodeURIComponent(change.itemId)}` as const);
   if (change.action === 'delete') return api.request<void>(itemPath, { method: 'DELETE' });
-  return api.request<Entries[K]>(itemPath, { method: 'PATCH', body: change.body });
+  const response = await api.request<Entries[K]>(itemPath, {
+    method: change.action === 'create' ? 'POST' : 'PATCH',
+    body: change.body,
+    money,
+  });
+  return money ? checkedMoneyResponse(factorMoney, response) : response;
 }
 
 export const expenseLabels = {

@@ -10,6 +10,7 @@ import type { AppConfig } from '@/shared/config/env';
 import { comparisonRequestSchema, fixtureComparison } from './comparison';
 import { findShowcaseListing } from './showcase';
 import { createMockStore } from './store';
+import { moneyValidationError, readMoneyInput } from './money';
 import { fixtureSummary } from './summary';
 import { vehicleWriteHandlers } from './vehicle-writes';
 
@@ -107,9 +108,9 @@ export function handlers(config: AppConfig, storage: Storage, locks?: LockManage
     http.post(url('/api/cars'), async ({ request }) => {
       const session = sessionFor(request);
       if (!session) return unauthorized();
-      const parsed = carInputSchema.safeParse(await request.json().catch(() => null));
+      const parsed = carInputSchema.safeParse(await readMoneyInput(request));
       if (!parsed.success)
-        return error(422, 'validation_error', 'Проверьте характеристики автомобиля.');
+        return moneyValidationError(parsed.error, 'Проверьте характеристики автомобиля.');
       const created = await store.add(session.token, parsed.data);
       return created ? response(created, 201) : unauthorized();
     }),

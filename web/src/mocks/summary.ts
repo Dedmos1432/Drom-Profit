@@ -1,3 +1,9 @@
+import {
+  acquisitionCost as costSchema,
+  adjustedCost as adjustedSchema,
+  moneyAmount,
+  positiveMoney,
+} from '@/shared/api/money';
 import type { Car, Summary } from '@/entities/vehicle/api';
 
 export type SummaryInput = Pick<Car, 'id' | 'price' | 'expenses_reviewed' | 'benefits_reviewed'> & {
@@ -21,9 +27,14 @@ export function fixtureSummary(car: SummaryInput): Summary {
   const acquisitionCost = car.price + expenses.total;
   const adjustedCost = acquisitionCost - benefits.total;
   if (
-    ![car.price, expenses.total, benefits.total, acquisitionCost, adjustedCost].every(
-      Number.isSafeInteger,
-    )
+    !positiveMoney.safeParse(car.price).success ||
+    ![...car.expenses, ...car.benefits].every(
+      ({ amount }) => amount === null || moneyAmount.safeParse(amount).success,
+    ) ||
+    !moneyAmount.safeParse(expenses.total).success ||
+    !moneyAmount.safeParse(benefits.total).success ||
+    !costSchema.safeParse(acquisitionCost).success ||
+    !adjustedSchema.safeParse(adjustedCost).success
   ) {
     throw new RangeError('Денежный итог превышает точный диапазон целых чисел.');
   }

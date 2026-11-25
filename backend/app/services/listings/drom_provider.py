@@ -10,7 +10,7 @@ import time
 from datetime import datetime, timezone
 
 from .errors import ListingImportError
-from .html_parser import extract_listing_fields
+from .html_parser import extract_listing_fields, looks_blocked
 from .http_worker import get_html
 from .models import ListingData
 from .normalize import normalize_listing
@@ -97,5 +97,8 @@ def listing_from_html(html: str, target: ListingUrl) -> ListingData:
         fetched_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
     )
     if listing.price is None:
-        raise ListingImportError("parse_error", "не подтверждена цена в рублях")
+        if looks_blocked(html):
+            raise ListingImportError("source_forbidden", "страница проверки или блокировки")
+        if not listing.brand or not listing.model:
+            raise ListingImportError("parse_error", "объявление без цены не распознано однозначно")
     return listing

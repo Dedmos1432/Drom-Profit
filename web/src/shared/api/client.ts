@@ -1,3 +1,4 @@
+import { parseMoneyJson } from './money';
 import type { components } from './schema';
 
 type ContractError = components['schemas']['Error'];
@@ -7,6 +8,7 @@ type RequestOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: unknown;
   signal?: AbortSignal;
+  money?: boolean;
 };
 
 export class ApiError extends Error {
@@ -52,7 +54,7 @@ export function createApiClient({
 }: ApiClientOptions) {
   async function request<Result>(
     path: ApiPath,
-    { method = 'GET', body, signal }: RequestOptions = {},
+    { method = 'GET', body, signal, money = false }: RequestOptions = {},
   ): Promise<Result> {
     const headers = new Headers({ Accept: 'application/json' });
     const token = getToken?.();
@@ -82,7 +84,8 @@ export function createApiClient({
 
     let payload: unknown;
     try {
-      payload = await response.json();
+      payload =
+        money && response.ok ? await parseMoneyJson(await response.text()) : await response.json();
     } catch (cause) {
       if (signal?.aborted) throw cause;
       if (response.ok) {

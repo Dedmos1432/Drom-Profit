@@ -15,10 +15,19 @@ from pydantic import (
 from typing_extensions import TypedDict
 
 from .formats import validate_timestamp, validate_uri
+from .money import ADJUSTED_COST_MIN, COST_MAX, DIFFERENCE_MAX, MONEY_LIMIT
 
 
 MAX_INT64 = (1 << 63) - 1
-Price = Annotated[StrictInt, Field(ge=1, le=MAX_INT64)]
+Price = Annotated[StrictInt, Field(ge=1, le=MONEY_LIMIT, json_schema_extra={"format": "int64"})]
+MoneyAmount = Annotated[StrictInt, Field(ge=0, le=MONEY_LIMIT, json_schema_extra={"format": "int64"})]
+AcquisitionCost = Annotated[StrictInt, Field(ge=1, le=COST_MAX, json_schema_extra={"format": "int64"})]
+AdjustedCost = Annotated[
+    StrictInt, Field(ge=ADJUSTED_COST_MIN, le=COST_MAX, json_schema_extra={"format": "int64"})
+]
+ComparisonDifference = Annotated[
+    StrictInt, Field(ge=0, le=DIFFERENCE_MAX, json_schema_extra={"format": "int64"})
+]
 NonnegativeInteger = Annotated[StrictInt, Field(ge=0, le=MAX_INT64)]
 Year = Annotated[StrictInt, Field(ge=1886, le=MAX_INT64)]
 EngineVolume = Annotated[float, Field(strict=True, ge=0, allow_inf_nan=False)]
@@ -62,7 +71,7 @@ class ListingFields(Schema):
     city: str | None
     image_url: Uri | None
     listing_url: Uri | None
-    market_valuation: NonnegativeInteger | None
+    market_valuation: Price | None
     fetched_at: Timestamp | None
 
 
@@ -88,7 +97,7 @@ class CarInput(ListingFields):
     city: str | None = None
     image_url: Uri | None = None
     listing_url: Uri | None = None
-    market_valuation: NonnegativeInteger | None = None
+    market_valuation: Price | None = None
     fetched_at: Timestamp | None = None
 
 
@@ -109,14 +118,14 @@ class CarPatch(TypedDict, total=False):
     city: str | None
     image_url: Uri | None
     listing_url: Uri | None
-    market_valuation: NonnegativeInteger | None
+    market_valuation: Price | None
     expenses_reviewed: StrictBool
     benefits_reviewed: StrictBool
 
 
 class BenefitInput(Schema):
     title: Nonblank
-    amount: NonnegativeInteger | None
+    amount: MoneyAmount | None
     factor_key: str | None = None
     comment: str | None = None
 
@@ -129,7 +138,7 @@ class BenefitPatch(TypedDict, total=False):
     __pydantic_config__ = ConfigDict(extra="forbid")
 
     title: Nonblank
-    amount: NonnegativeInteger | None
+    amount: MoneyAmount | None
     factor_key: str | None
     comment: str | None
 
@@ -201,11 +210,11 @@ class ImportRequest(Schema):
 
 class Summary(Schema):
     car_id: str
-    listing_price: Annotated[int, Field(ge=1)]
-    total_expenses: Annotated[int, Field(ge=0)]
-    total_benefits: Annotated[int, Field(ge=0)]
-    acquisition_cost: Annotated[int, Field(ge=0)]
-    adjusted_cost: int
+    listing_price: Price
+    total_expenses: MoneyAmount
+    total_benefits: MoneyAmount
+    acquisition_cost: AcquisitionCost
+    adjusted_cost: AdjustedCost
     assessment_status: Literal["complete", "incomplete"]
     unknown_expenses: Annotated[int, Field(ge=0)]
     unknown_benefits: Annotated[int, Field(ge=0)]
@@ -223,7 +232,7 @@ class ComparisonRequest(Schema):
 
 
 class ComparisonItem(Summary):
-    difference_from_min: Annotated[int, Field(ge=0)] | None
+    difference_from_min: ComparisonDifference | None
 
 
 class Warning(Schema):

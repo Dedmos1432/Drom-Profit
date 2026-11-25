@@ -57,6 +57,9 @@ class DromPageMarkup(HTMLParser):
                 self._value_depth += 1
             if tag in {"style", "script", "button"}:
                 self._hidden += 1
+        elif marker == "bulletin-price":
+            self._capture = (tag, "price")
+            self._value_depth = 1
         elif marker == "value":
             if tag == "td" and self._specs == 1 and self._row:
                 self._capture = (tag, self._row)
@@ -99,6 +102,10 @@ class DromPageMarkup(HTMLParser):
     def handle_data(self, data: str) -> None:
         if self._capture and not self._hidden:
             self._text.append(data)
+
+    @property
+    def prices(self) -> set[str]:
+        return self._values.get("price", set())
 
     @property
     def images(self) -> list[str]:

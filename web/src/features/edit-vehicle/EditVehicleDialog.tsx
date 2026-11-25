@@ -25,7 +25,7 @@ export function EditVehicleDialog({ car, onClose }: { car: Car; onClose: () => v
       <VehicleForm
         car={car}
         saving={update.isPending}
-        failed={update.isError}
+        failure={update.error}
         onSave={save}
         onCancel={onClose}
       />

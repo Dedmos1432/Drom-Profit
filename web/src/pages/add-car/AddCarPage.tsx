@@ -111,7 +111,7 @@ export function AddCarPage() {
               key="manual"
               onSave={saveCar}
               saving={save.isPending}
-              failed={save.isError}
+              failure={save.error}
             />
           </Stack>
         </section>
@@ -182,7 +182,7 @@ export function AddCarPage() {
                   listing={preview.listing}
                   onSave={saveCar}
                   saving={save.isPending}
-                  failed={save.isError}
+                  failure={save.error}
                 />
               </Stack>
             </section>

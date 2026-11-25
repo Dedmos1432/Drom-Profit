@@ -15,6 +15,8 @@ import {
   noteInputSchema,
 } from '@/entities/vehicle/record-validation';
 import { carPatchSchema } from '@/entities/vehicle/validation';
+import { MONEY_LIMIT, MONEY_LIMIT_LABEL } from '@/shared/api/money';
+import { amountOutOfRange, moneyValidationError, readMoneyInput } from './money';
 import { changedFields } from '@/shared/lib/changed-fields';
 import type { components } from '@/shared/api/schema';
 
@@ -25,7 +27,8 @@ function error(status: number, code: string, message: string) {
   return HttpResponse.json<components['schemas']['Error']>({ code, message }, { status });
 }
 
-const invalid = () => error(422, 'validation_error', 'Проверьте введённые данные.');
+const invalid = (failure: z.ZodError) =>
+  moneyValidationError(failure, 'Проверьте введённые данные.');
 const missing = () => error(404, 'item_not_found', 'Запись не найдена.');
 const duplicate = () =>
   error(400, 'duplicate_factor', 'Запись с таким ключом и категорией уже есть.');
@@ -47,16 +50,32 @@ type RecordOptions<Item extends { id: string }, Input> = {
   conflict?: (car: Car, candidate: Item) => Response | undefined;
 };
 
+function checkGroupAmount(
+  entries: readonly (Expense | Benefit)[],
+  candidate: Expense | Benefit,
+  group: string,
+) {
+  const total = entries.reduce(
+    (sum, item) => sum + (item.id === candidate.id ? 0 : (item.amount ?? 0)),
+    candidate.amount ?? 0,
+  );
+  if (total > MONEY_LIMIT) {
+    return amountOutOfRange('Сумма ' + group + ' не должна превышать ' + MONEY_LIMIT_LABEL + '.');
+  }
+}
+
 function recordHandlers<Item extends { id: string }, Input>(
   mutateCar: MutateCar,
   options: RecordOptions<Item, Input>,
 ) {
   return [
     http.post(options.url, async ({ request, params }) => {
-      const body = await request.json().catch(() => null);
+      const body = options.review
+        ? await readMoneyInput(request)
+        : await request.json().catch(() => null);
       return mutateCar(request, String(params.carId), (car) => {
         const parsed = options.input.safeParse(body);
-        if (!parsed.success) return invalid();
+        if (!parsed.success) return invalid(parsed.error);
         const item = options.create(parsed.data);
         const conflict = options.conflict?.(car, item);
         if (conflict) return conflict;
@@ -66,14 +85,16 @@ function recordHandlers<Item extends { id: string }, Input>(
       });
     }),
     http.patch(options.url + '/:itemId', async ({ request, params }) => {
-      const body = await request.json().catch(() => null);
+      const body = options.review
+        ? await readMoneyInput(request)
+        : await request.json().catch(() => null);
       return mutateCar(request, String(params.carId), (car) => {
         const entries = options.entries(car);
         const index = entries.findIndex(({ id }) => id === params.itemId);
         const item = entries[index];
         if (!item) return missing();
         const parsed = options.patch.safeParse(body);
-        if (!parsed.success) return invalid();
+        if (!parsed.success) return invalid(parsed.error);
         const patch = changedFields<Omit<Item, 'id'>>(item, parsed.data);
         if (!Object.keys(patch).length) return HttpResponse.json(item);
         const next = { ...item, ...patch };
@@ -100,10 +121,10 @@ function recordHandlers<Item extends { id: string }, Input>(
 export function vehicleWriteHandlers(url: (path: string) => string, mutateCar: MutateCar) {
   return [
     http.patch(url('/api/cars/:carId'), async ({ request, params }) => {
-      const body = await request.json().catch(() => null);
+      const body = await readMoneyInput(request);
       return mutateCar(request, String(params.carId), (car) => {
         const parsed = carPatchSchema.safeParse(body);
-        if (!parsed.success) return invalid();
+        if (!parsed.success) return invalid(parsed.error);
         const { expenses_reviewed, benefits_reviewed, ...fields } = parsed.data;
         const changes = changedFields(car, fields);
         if (Object.keys(changes).length) {
@@ -129,6 +150,8 @@ export function vehicleWriteHandlers(url: (path: string) => string, mutateCar: M
       }),
       review: 'expenses_reviewed',
       conflict(car, candidate) {
+        const excess = checkGroupAmount(car.expenses, candidate, 'расходов');
+        if (excess) return excess;
         const key = candidate.factor_key;
         if (!key) return;
         if (
@@ -158,6 +181,8 @@ export function vehicleWriteHandlers(url: (path: string) => string, mutateCar: M
       }),
       review: 'benefits_reviewed',
       conflict(car, candidate) {
+        const excess = checkGroupAmount(car.benefits, candidate, 'преимуществ');
+        if (excess) return excess;
         const key = candidate.factor_key;
         if (!key) return;
         if (car.benefits.some((item) => item.id !== candidate.id && item.factor_key === key))

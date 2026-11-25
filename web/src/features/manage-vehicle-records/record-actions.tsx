@@ -21,7 +21,7 @@ export function recordError(error: unknown) {
       return 'Одно и то же оснащение нельзя учитывать одновременно как расход и преимущество.';
     }
     if (error.status === 404) return 'Запись недоступна. Закройте форму и обновите страницу.';
-    if (error.status === 400) return error.message;
+    if (error.status === 400 || error.code === 'amount_out_of_range') return error.message;
   }
   return 'Введённые данные сохранены в форме. Повторите попытку.';
 }

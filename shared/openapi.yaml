@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
   title: Drom Profit API
-  version: 0.1.0
-  description: 'Черновик для согласования. Ошибки импорта: invalid_url (400), listing_unavailable (404), source_forbidden
+  version: 0.2.0
+  description: 'Денежные диапазоны MVP действуют с версии 0.2.0. Ошибки импорта: invalid_url (400), listing_unavailable (404), source_forbidden
     (403), parse_error (502), source_unavailable (503). Все ошибки, включая validation, в формате Error. Все ресурсы
     кроме создания сессии требуют Bearer token. PATCH — частичное изменение; null допустим только для nullable полей.
     При одновременном изменении характеристик и флагов сначала сбрасывать флаги, затем применять явно переданные
@@ -78,7 +78,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '502':
-          description: Error
+          description: "parse_error при нераспознанном объявлении, некорректной цене либо неподдерживаемой валюте."
           content:
             application/json:
               schema:
@@ -113,7 +113,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Error
+          description: "validation_error при некорректной структуре или денежном литерале. amount_out_of_range при выходе за денежный диапазон."
           content:
             application/json:
               schema:
@@ -230,7 +230,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Error
+          description: "validation_error при некорректной структуре или денежном литерале. amount_out_of_range при выходе за денежный диапазон."
           content:
             application/json:
               schema:
@@ -313,7 +313,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Error
+          description: "validation_error при некорректной структуре или денежном литерале. amount_out_of_range при выходе за денежный диапазон поля или суммы группы."
           content:
             application/json:
               schema:
@@ -360,7 +360,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Error
+          description: "validation_error при некорректной структуре или денежном литерале. amount_out_of_range при выходе за денежный диапазон поля или суммы группы."
           content:
             application/json:
               schema:
@@ -453,7 +453,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Error
+          description: "validation_error при некорректной структуре или денежном литерале. amount_out_of_range при выходе за денежный диапазон поля или суммы группы."
           content:
             application/json:
               schema:
@@ -500,7 +500,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Error
+          description: "validation_error при некорректной структуре или денежном литерале. amount_out_of_range при выходе за денежный диапазон поля или суммы группы."
           content:
             application/json:
               schema:
@@ -827,8 +827,11 @@ components:
           nullable: true
         price:
           type: integer
+          format: int64
           minimum: 1
+          maximum: 1000000000000
           nullable: true
+          description: Целые рубли. null означает распознанное объявление без цены.
         mileage_km: &id004
           type: integer
           minimum: 0
@@ -866,8 +869,11 @@ components:
           nullable: true
         market_valuation: &id014
           type: integer
-          minimum: 0
+          format: int64
+          minimum: 1
+          maximum: 1000000000000
           nullable: true
+          description: Целые рубли. Только целочисленный JSON-литерал в десятичной записи без дроби, экспоненты и кавычек. -0 эквивалентен 0.
         fetched_at: &id015
           type: string
           format: date-time
@@ -906,7 +912,10 @@ components:
         year: *id003
         price: &id018
           type: integer
+          format: int64
           minimum: 1
+          maximum: 1000000000000
+          description: Целые рубли. Только целочисленный JSON-литерал в десятичной записи без дроби, экспоненты и кавычек. -0 эквивалентен 0.
         mileage_km: *id004
         trim: *id005
         fuel_type: *id006
@@ -977,18 +986,29 @@ components:
           type: string
         listing_price: &id020
           type: integer
+          format: int64
           minimum: 1
+          maximum: 1000000000000
         total_expenses: &id021
           type: integer
+          format: int64
           minimum: 0
+          maximum: 1000000000000
         total_benefits: &id022
           type: integer
+          format: int64
           minimum: 0
+          maximum: 1000000000000
         acquisition_cost: &id023
           type: integer
-          minimum: 0
+          format: int64
+          minimum: 1
+          maximum: 2000000000000
         adjusted_cost: &id024
           type: integer
+          format: int64
+          minimum: -999999999999
+          maximum: 2000000000000
         assessment_status: &id025
           type: string
           enum:
@@ -1037,7 +1057,9 @@ components:
         unknown_benefits: *id027
         difference_from_min:
           type: integer
+          format: int64
           minimum: 0
+          maximum: 2999999999999
           nullable: true
       required:
       - car_id
@@ -1095,8 +1117,11 @@ components:
           - other
         amount: &id031
           type: integer
+          format: int64
           minimum: 0
+          maximum: 1000000000000
           nullable: true
+          description: Целые рубли. Только целочисленный JSON-литерал в десятичной записи без дроби, экспоненты и кавычек. -0 эквивалентен 0.
         factor_key: &id032
           type: string
           nullable: true
@@ -1138,8 +1163,11 @@ components:
           minLength: 1
         amount: &id036
           type: integer
+          format: int64
           minimum: 0
+          maximum: 1000000000000
           nullable: true
+          description: Целые рубли. Только целочисленный JSON-литерал в десятичной записи без дроби, экспоненты и кавычек. -0 эквивалентен 0.
         factor_key: &id037
           type: string
           nullable: true

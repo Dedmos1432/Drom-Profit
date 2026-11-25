@@ -9,14 +9,16 @@
 """
 
 import json
+import re
 from collections import deque
+from decimal import Decimal, DecimalException
 from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import urljoin, urlsplit
 
 from .drom_markup import DromPageMarkup
 from .errors import ListingImportError
-from .normalize import https_url
+from .normalize import https_url, parse_price
 from .urls import HostAllowlist, ListingUrl, validate_listing_url
 
 _VEHICLE_TYPES = {"car", "vehicle", "motorizedbicycle", "product", "individualproduct"}
@@ -123,7 +125,7 @@ def _quantity(value: Any, units: dict[str, str]) -> str | None:
                 units.get(unit.strip().lower()) if isinstance(unit, str) else None
                 for unit in declared
             }
-            if None in suffixes or len(suffixes) != 1 or type(amount) not in (str, int, float):
+            if None in suffixes or len(suffixes) != 1 or type(amount) not in (str, int, float, Decimal):
                 return None
             return f"{amount} {suffixes.pop()}"
         value = amount
@@ -209,6 +211,8 @@ def _offer(item: dict[str, Any], target: ListingUrl | None) -> dict[str, Any]:
         else:
             offers.append(entry)
     if not offers:
+        if values not in (None, []):
+            raise ListingImportError("parse_error", "не удалось распознать предложение")
         return {}
 
     if target is not None:
@@ -221,6 +225,36 @@ def _offer(item: dict[str, Any], target: ListingUrl | None) -> dict[str, Any]:
     if len(offers) != 1:
         raise ListingImportError("parse_error", "в объявлении несколько подходящих предложений")
     return offers[0]
+
+
+def _offer_price(offer: dict[str, Any]) -> tuple[Any, bool]:
+    candidates = [(offer.get("price"), offer.get("priceCurrency"))]
+    specifications = offer.get("priceSpecification")
+    if specifications is not None:
+        for spec in specifications if isinstance(specifications, list) else [specifications]:
+            if not isinstance(spec, dict) or spec.get("price") is None:
+                return None, True
+            candidates.append((spec["price"], spec.get("priceCurrency", offer.get("priceCurrency"))))
+    for key in ("lowPrice", "highPrice"):
+        if offer.get(key) is not None:
+            candidates.append((offer[key], offer.get("priceCurrency")))
+
+    prices = set()
+    raw_price = None
+    for raw, currency in candidates:
+        if raw is None:
+            continue
+        if not isinstance(currency, str) or currency.strip().upper() not in {"RUB", "RUR"}:
+            return None, True
+        price = parse_price(raw)
+        if price is None:
+            return None, True
+        if raw_price is None:
+            raw_price = raw
+        prices.add(price)
+    if len(prices) > 1:
+        return None, True
+    return raw_price, False
 
 
 def _image_urls(images: Any, og_images: list[str], page_url: str | None) -> tuple[str, ...]:
@@ -294,8 +328,8 @@ def extract_listing_fields(html: str, *, target: ListingUrl | None = None) -> di
         if len(block) > MAX_JSON_LD_LENGTH:
             continue
         try:
-            data = json.loads(block)
-        except (ValueError, RecursionError):
+            data = json.loads(block, parse_float=Decimal)
+        except (ValueError, DecimalException, RecursionError):
             continue
         candidates.extend(item for item in _walk(data) if _types(item) & _VEHICLE_TYPES)
 
@@ -316,8 +350,19 @@ def extract_listing_fields(html: str, *, target: ListingUrl | None = None) -> di
     if availability in _UNAVAILABLE:
         raise ListingImportError("listing_unavailable", "объявление снято с продажи")
 
-    currency = offer.get("priceCurrency")
-    is_ruble = isinstance(currency, str) and currency.strip().upper() in {"RUB", "RUR"}
+    price, invalid_price = _offer_price(offer)
+    if markup.prices:
+        visible_prices = {
+            parse_price(value)
+            if re.search(r"(?:₽|руб\.?|р\.?|rub)$", value, re.IGNORECASE) else None
+            for value in markup.prices
+        }
+        if None in visible_prices or len(visible_prices) != 1:
+            invalid_price = True
+        elif price is None:
+            price = next(iter(visible_prices))
+        elif parse_price(price) not in visible_prices:
+            invalid_price = True
     engine = _first(vehicle.get("vehicleEngine"))
     engine = engine if isinstance(engine, dict) else {}
     page_url = target.canonical if target else None
@@ -335,7 +380,8 @@ def extract_listing_fields(html: str, *, target: ListingUrl | None = None) -> di
         "model": _name(vehicle.get("model")),
         "year": vehicle.get("vehicleModelDate") or vehicle.get("productionDate")
         or vehicle.get("modelDate") or markup.value("year"),
-        "price": offer.get("price") if is_ruble else None,
+        "price": price,
+        "_price_invalid": invalid_price,
         "mileage_km": _quantity(
             markup.value("mileage_km") if mileage is None else mileage, _MILEAGE_UNITS
         ),

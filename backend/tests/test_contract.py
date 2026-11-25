@@ -6,6 +6,7 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+from app.money import MONEY_LIMIT
 from app.schemas import Error, MAX_INT64
 from app.services.listing_import import ListingImportError
 
@@ -18,7 +19,7 @@ def json_schema(operation, section):
     return None if schema is None else field_contract(schema)
 
 
-def field_contract(field):
+def field_contract(field, *, money=False):
     field = dict(field)
     if "anyOf" in field:
         value, null = field["anyOf"]
@@ -32,7 +33,7 @@ def field_contract(field):
         key: value
         for key, value in field.items()
         if key in {"$ref", "type", "items", "enum", "nullable", "minimum", "minLength", "minItems",
-                   "uniqueItems", "format"}
+                   "uniqueItems", "format"} or (money and key == "maximum")
     }
 
 
@@ -71,7 +72,10 @@ def test_runtime_routes_match_shared_contract():
         assert spec["additionalProperties"] == schema["additionalProperties"], name
         assert spec["properties"].keys() == schema["properties"].keys(), name
         for field, expected in spec["properties"].items():
-            assert field_contract(schema["properties"][field]) == field_contract(expected), (name, field)
+            money = expected.get("format") == "int64"
+            assert field_contract(schema["properties"][field], money=money) == field_contract(
+                expected, money=money
+            ), (name, field)
 
 
 @pytest.mark.parametrize("price", [None, 0, -1, 1.5, 2.0, True, "1000", MAX_INT64 + 1])
@@ -81,7 +85,8 @@ def test_rejects_invalid_price(client, headers, price):
         json={"source": "manual", "brand": "Toyota", "model": "Camry", "price": price},
     )
     assert response.status_code == 422
-    assert response.json()["code"] == "validation_error"
+    code = "amount_out_of_range" if type(price) is int else "validation_error"
+    assert response.json()["code"] == code
     assert set(response.json()) == {"code", "message"}
     assert client.get("/api/cars", headers=headers).json() == []
 
@@ -121,14 +126,14 @@ def test_patch_rejects_nonnullable_unknown_and_immutable_fields(client, headers,
 
 
 def test_large_money_totals_remain_exact(client, headers, new_car):
-    path = new_car(price=MAX_INT64)
+    path = new_car(price=MONEY_LIMIT)
     expense = client.post(
         f"{path}/expenses", headers=headers,
-        json={"title": "Ремонт", "kind": "repair", "amount": MAX_INT64},
+        json={"title": "Ремонт", "kind": "repair", "amount": MONEY_LIMIT},
     )
     assert expense.status_code == 201
     result = client.get(f"{path}/summary", headers=headers).json()
-    assert result["acquisition_cost"] == result["adjusted_cost"] == 2 * MAX_INT64
+    assert result["acquisition_cost"] == result["adjusted_cost"] == 2 * MONEY_LIMIT
 
 
 @pytest.mark.parametrize("ids", [[], ["a"], ["a", "a"], [1, "a"]])

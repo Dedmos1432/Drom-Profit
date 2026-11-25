@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { comparisonDifference } from '@/shared/api/money';
 import type { Comparison, ComparisonRequest, ComparisonWarning } from '@/entities/comparison/api';
 import type { Benefit, Expense } from '@/entities/vehicle/records';
 import { fixtureSummary } from './summary';
@@ -55,7 +56,7 @@ export function fixtureComparison(cars: readonly ComparisonCar[]): Comparison {
     warnings,
     items: summaries.map((summary) => {
       const difference = conflicts.size ? null : summary.adjusted_cost - minimum;
-      if (difference !== null && !Number.isSafeInteger(difference)) {
+      if (difference !== null && !comparisonDifference.safeParse(difference).success) {
         throw new RangeError('Разница превышает точный диапазон целых рублей.');
       }
       return { ...summary, difference_from_min: difference };

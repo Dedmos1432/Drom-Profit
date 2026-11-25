@@ -5,14 +5,19 @@ dataclass проверяет типы и ограничения контракт
 преобразует результат через ``schemas.ListingData.model_validate(data.as_dict())``.
 """
 
+import logging
 from dataclasses import asdict, dataclass, fields
 from datetime import datetime
 from typing import Any, Literal
 
+from ...money import MONEY_LIMIT
+
+logger = logging.getLogger(__name__)
+
 ListingSource = Literal["drom", "demo"]
 SOURCES = ("drom", "demo")  # manual задается только клиентом, импорт его не выдает
 
-_INT_FIELDS = {"year": 1886, "price": 1, "mileage_km": 0, "power_hp": 0, "market_valuation": 0}
+_INT_FIELDS = {"year": 1886, "price": 1, "mileage_km": 0, "power_hp": 0}
 _STR_FIELDS = (
     "listing_id", "brand", "model", "trim", "fuel_type", "transmission", "drive_type", "city",
     "image_url", "listing_url", "fetched_at",
@@ -55,6 +60,13 @@ class ListingData:
                 continue
             if type(value) is not int or value < minimum:
                 raise ValueError(f"{name}: ожидается целое >= {minimum}")
+        if self.price is not None and self.price > MONEY_LIMIT:
+            raise ValueError("price: сумма выше предела")
+        if self.market_valuation is not None and (
+            type(self.market_valuation) is not int or not 1 <= self.market_valuation <= MONEY_LIMIT
+        ):
+            logger.info("listing market valuation ignored: invalid amount")
+            object.__setattr__(self, "market_valuation", None)
         for name in _STR_FIELDS:
             value = getattr(self, name)
             if value is not None and (type(value) is not str or not value.strip()):

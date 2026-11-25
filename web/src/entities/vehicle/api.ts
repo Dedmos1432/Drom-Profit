@@ -3,6 +3,14 @@ import { z } from 'zod';
 import { sessionDataKey } from '@/entities/session/session-store';
 import { useSession } from '@/entities/session/SessionBoundary';
 import { ApiError } from '@/shared/api/client';
+import {
+  acquisitionCost,
+  adjustedCost,
+  carMoney,
+  listingMoney,
+  moneyAmount,
+  positiveMoney,
+} from '@/shared/api/money';
 import type { createApiClient } from '@/shared/api/client';
 import type { components, paths } from '@/shared/api/schema';
 
@@ -19,11 +27,11 @@ export type Summary = components['schemas']['Summary'];
 const nonnegative = z.int().nonnegative();
 export const summarySchema = z.object({
   car_id: z.string(),
-  listing_price: z.int().positive(),
-  total_expenses: nonnegative,
-  total_benefits: nonnegative,
-  acquisition_cost: nonnegative,
-  adjusted_cost: z.int(),
+  listing_price: positiveMoney,
+  total_expenses: moneyAmount,
+  total_benefits: moneyAmount,
+  acquisition_cost: acquisitionCost,
+  adjusted_cost: adjustedCost,
   assessment_status: z.enum(['complete', 'incomplete']),
   unknown_expenses: nonnegative,
   unknown_benefits: nonnegative,
@@ -40,12 +48,28 @@ export const vehicleKeys = {
   summary: (id: string) => [...carsKey, 'summary', id] as const,
 };
 
+export function checkedMoneyResponse<T>(schema: z.ZodType, payload: T): T {
+  if (!schema.safeParse(payload).success) {
+    throw new ApiError('invalid_response', 'invalid_money', 'Сервер вернул некорректную сумму.');
+  }
+  return payload;
+}
+
+const carsMoney = z.array(carMoney);
+
 export const vehicleApi = {
-  list: (api: Api) => api.request<Car[]>('/api/cars'),
-  detail: (api: Api, id: string, signal: AbortSignal) =>
-    api.request<Car>(vehiclePath(id), { signal }),
+  list: async (api: Api) =>
+    checkedMoneyResponse(carsMoney, await api.request<Car[]>('/api/cars', { money: true })),
+  detail: async (api: Api, id: string, signal: AbortSignal) =>
+    checkedMoneyResponse(
+      carMoney,
+      await api.request<Car>(vehiclePath(id), { signal, money: true }),
+    ),
   async summary(api: Api, id: string, signal: AbortSignal) {
-    const payload = await api.request<unknown>(`${vehiclePath(id)}/summary`, { signal });
+    const payload = await api.request<unknown>(`${vehiclePath(id)}/summary`, {
+      signal,
+      money: true,
+    });
     const result = summarySchema.safeParse(payload);
     if (!result.success || result.data.car_id !== id) {
       throw new ApiError(
@@ -56,11 +80,21 @@ export const vehicleApi = {
     }
     return result.data;
   },
-  import: (api: Api, body: ImportInput) =>
-    api.request<Listing>('/api/cars/import', { method: 'POST', body }),
-  create: (api: Api, body: CarInput) => api.request<Car>('/api/cars', { method: 'POST', body }),
-  patch: (api: Api, id: string, body: CarPatch) =>
-    api.request<Car>(vehiclePath(id), { method: 'PATCH', body }),
+  import: async (api: Api, body: ImportInput) =>
+    checkedMoneyResponse(
+      listingMoney,
+      await api.request<Listing>('/api/cars/import', { method: 'POST', body, money: true }),
+    ),
+  create: async (api: Api, body: CarInput) =>
+    checkedMoneyResponse(
+      carMoney,
+      await api.request<Car>('/api/cars', { method: 'POST', body, money: true }),
+    ),
+  patch: async (api: Api, id: string, body: CarPatch) =>
+    checkedMoneyResponse(
+      carMoney,
+      await api.request<Car>(vehiclePath(id), { method: 'PATCH', body, money: true }),
+    ),
   remove: (api: Api, id: string) => api.request<void>(vehiclePath(id), { method: 'DELETE' }),
 };
 

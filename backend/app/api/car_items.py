@@ -7,6 +7,7 @@ from .. import schemas
 from ..db import Database
 from ..errors import APIError, not_found
 from ..models import Benefit, Car, Expense, Note
+from ..money import MONEY_LIMIT, MONEY_LIMIT_LABEL
 from ..services.calculation import missing_equipment_keys
 from .cars import require_car
 from .sessions import Owner
@@ -36,6 +37,14 @@ def validate_factors(car: Car) -> None:
         raise APIError(422, "conflicting_equipment", "Учитывайте оснащение в карточке одним способом")
 
 
+def validate_group_amount(car: Car, item: Expense | Benefit, amount: int | None) -> None:
+    group = car.expenses if isinstance(item, Expense) else car.benefits
+    total = sum(other.amount or 0 for other in group if other is not item) + (amount or 0)
+    if total > MONEY_LIMIT:
+        name = "расходов" if isinstance(item, Expense) else "преимуществ"
+        raise APIError(422, "amount_out_of_range", f"Сумма {name} не должна превышать {MONEY_LIMIT_LABEL}.")
+
+
 def reset_review(car: Car, item: Expense | Benefit | Note) -> None:
     if isinstance(item, Expense):
         car.expenses_reviewed = False
@@ -44,6 +53,8 @@ def reset_review(car: Car, item: Expense | Benefit | Note) -> None:
 
 
 def add_item(db: Session, car: Car, items: list[Item], item: Item) -> Item:
+    if not isinstance(item, Note):
+        validate_group_amount(car, item, item.amount)
     items.append(item)
     if not isinstance(item, Note):
         validate_factors(car)
@@ -54,6 +65,8 @@ def add_item(db: Session, car: Car, items: list[Item], item: Item) -> Item:
 
 def update_item(db: Session, car: Car, item: Item, changes: dict) -> Item:
     if any(getattr(item, field) != value for field, value in changes.items()):
+        if not isinstance(item, Note) and "amount" in changes:
+            validate_group_amount(car, item, changes["amount"])
         for field, value in changes.items():
             setattr(item, field, value)
         if not isinstance(item, Note):

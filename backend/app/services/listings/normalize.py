@@ -8,14 +8,20 @@
   значение вне словаря сохраняется очищенным текстом, чтобы не терять сведения.
 """
 
+import logging
 import math
 import re
 from collections.abc import Mapping
 from datetime import date
+from decimal import Decimal
 from typing import Any
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
+from ...money import MONEY_LIMIT
+from .errors import ListingImportError
 from .models import ListingData, ListingSource
+
+logger = logging.getLogger(__name__)
 
 _SPACES = re.compile(r"[\s   ]+")
 _PLACEHOLDERS = {"", "-", "—", "–", "нет", "нет данных", "не указано", "не указан", "null", "none"}
@@ -72,24 +78,33 @@ def _plain_int(value: Any) -> int | None:
         return None
     if isinstance(value, int):
         return value
-    if isinstance(value, float) and math.isfinite(value) and value.is_integer():
+    if isinstance(value, (float, Decimal)) and math.isfinite(value) and value == int(value):
         return int(value)
     return None
 
 
 def parse_price(value: Any) -> int | None:
-    """``1200000``, ``"1 200 000 ₽"``, ``"1200000 руб."`` → 1200000. Ноль и минус — ``None``."""
-    number = _plain_int(value)
-    if number is None:
-        text = _compact(value)
-        match = text and re.fullmatch(r"(\d{1,12})(?:₽|руб\.?|р\.?|rub)?", text)
-        number = int(match.group(1)) if match else None
-    return number if number is not None and number >= 1 else None
+    """Normalize one exact price in rubles, with optional grouping and a ruble suffix."""
+    if isinstance(value, str):
+        text = clean_text(value)
+        match = text and re.fullmatch(r"([0-9]+|[0-9]{1,3}(?: [0-9]{3})+) *(?:₽|руб\.?|р\.?|rub)?", text.lower())
+        value = int(match.group(1).replace(" ", "")) if match else None
+    if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
+        return None
+    if isinstance(value, Decimal) and not value.is_finite():
+        return None
+    if not 1 <= value <= MONEY_LIMIT:
+        return None
+    number = int(value)
+    return number if number == value else None
 
 
 def parse_market_valuation(value: Any) -> int | None:
-    """Оценка источника в рублях; формат как у цены."""
-    return parse_price(value)
+    """Normalize an optional source valuation without rejecting the listing."""
+    valuation = parse_price(value)
+    if value is not None and valuation is None:
+        logger.info("listing market valuation ignored: invalid amount")
+    return valuation
 
 
 def parse_mileage(value: Any) -> int | None:
@@ -129,7 +144,7 @@ def parse_engine_volume(value: Any) -> float | None:
     """Литры с одним знаком: ``2.5``, ``"2,5 л"``, ``"2494 см³"`` → 2.5."""
     if isinstance(value, bool):
         return None
-    if isinstance(value, (int, float)):
+    if isinstance(value, (int, float, Decimal)):
         liters = float(value)
         if liters >= 100:  # число без единиц больше 100 — кубические сантиметры
             liters /= 1000
@@ -241,13 +256,16 @@ def normalize_listing(
     fuel = normalize_fuel(raw.get("fuel_type")) or engine_fuel
     volume = parse_engine_volume(raw.get("engine_volume_l"))
     raw_id = raw.get("listing_id")
+    price = parse_price(raw.get("price"))
+    if raw.get("_price_invalid") or (raw.get("price") is not None and price is None):
+        raise ListingImportError("parse_error", "некорректная цена объявления в рублях")
     return ListingData(
         source=source,
         listing_id=clean_text(str(raw_id) if type(raw_id) is int else raw_id) or listing_id,
         brand=clean_text(raw.get("brand"), 80),
         model=clean_text(raw.get("model"), 80),
         year=parse_year(raw.get("year")),
-        price=parse_price(raw.get("price")),
+        price=price,
         mileage_km=parse_mileage(raw.get("mileage_km")),
         trim=clean_text(raw.get("trim")),
         fuel_type=fuel,

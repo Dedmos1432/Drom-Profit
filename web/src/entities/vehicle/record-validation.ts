@@ -1,10 +1,9 @@
 import { z } from 'zod';
+import { moneyAmount, rublesText } from '@/shared/api/money';
 import type { BenefitInput, ExpenseInput, NoteInput } from './records';
 
 const title = z.string().trim().min(1, 'Укажите название.');
-const amount = z
-  .int({ error: 'Укажите целое число рублей.' })
-  .nonnegative('Сумма должна быть не меньше нуля.');
+const amount = moneyAmount;
 const nullableText = z.string().nullable().optional();
 const factorKey = z
   .string()
@@ -32,12 +31,7 @@ export const noteInputSchema = z.strictObject({
   text,
 }) satisfies z.ZodType<NoteInput>;
 
-const amountText = z
-  .string()
-  .trim()
-  .regex(/^\d+$/, 'Укажите целое число рублей или отметьте неизвестную сумму.')
-  .transform(Number)
-  .pipe(amount);
+const amountText = rublesText.pipe(amount);
 const optionalText = z
   .string()
   .trim()

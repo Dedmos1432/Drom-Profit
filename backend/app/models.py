@@ -4,6 +4,9 @@ from sqlalchemy import BigInteger, CheckConstraint, Double, ForeignKey, String, 
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
+from .money import MONEY_LIMIT
+
+
 class Base(DeclarativeBase):
     type_annotation_map = {int: BigInteger(), float: Double()}
 
@@ -17,7 +20,13 @@ class UserSession(Base):
 
 class Car(Base):
     __tablename__ = "cars"
-    __table_args__ = (CheckConstraint("price > 0"),)
+    __table_args__ = (
+        CheckConstraint("price > 0"),
+        CheckConstraint(f"price BETWEEN 1 AND {MONEY_LIMIT}", name="ck_cars_price_money"),
+        CheckConstraint(
+            f"market_valuation BETWEEN 1 AND {MONEY_LIMIT}", name="ck_cars_market_valuation_money"
+        ),
+    )
 
     id: Mapped[str] = mapped_column(primary_key=True, default=lambda: str(uuid4()))
     session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), index=True)
@@ -68,6 +77,7 @@ class Expense(MonetaryFactor, Base):
     __tablename__ = "expenses"
     __table_args__ = (
         CheckConstraint("amount >= 0"),
+        CheckConstraint(f"amount BETWEEN 0 AND {MONEY_LIMIT}", name="ck_expenses_amount_money"),
         UniqueConstraint("car_id", "kind", "factor_key", name="uq_expenses_car_kind_key"),
     )
 
@@ -78,6 +88,7 @@ class Benefit(MonetaryFactor, Base):
     __tablename__ = "benefits"
     __table_args__ = (
         CheckConstraint("amount >= 0"),
+        CheckConstraint(f"amount BETWEEN 0 AND {MONEY_LIMIT}", name="ck_benefits_amount_money"),
         UniqueConstraint("car_id", "factor_key", name="uq_benefits_car_key"),
     )
 

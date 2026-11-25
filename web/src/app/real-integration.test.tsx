@@ -10,6 +10,7 @@ import { sessionStorageKey } from '@/entities/session/session-store';
 import { vehicleApi } from '@/entities/vehicle/api';
 import { recordError } from '@/features/manage-vehicle-records/record-actions';
 import { ApiError, createApiClient } from '@/shared/api/client';
+import { MONEY_LIMIT } from '@/shared/api/money';
 import { AppRoutes } from './router';
 
 const config = { mode: 'real', scenario: 'empty', baseUrl: 'http://127.0.0.1:8000' } as const;
@@ -132,7 +133,7 @@ it.each([
 const ids = ['first-car', 'second-car'];
 const summary = {
   car_id: ids[0],
-  listing_price: Number.MAX_SAFE_INTEGER,
+  listing_price: MONEY_LIMIT,
   total_expenses: 2,
   total_benefits: 0,
   acquisition_cost: 1_200_002,
@@ -176,7 +177,17 @@ it.each([
   localStorage.setItem(storedSession + '.scope', scope);
   localStorage.setItem(storedSession + '.comparison.' + scope, JSON.stringify(ids));
   server.use(
-    http.get(config.baseUrl + '/api/cars', () => HttpResponse.json(ids.map((id) => ({ id })))),
+    http.get(config.baseUrl + '/api/cars', () =>
+      HttpResponse.json(
+        ids.map((id) => ({
+          id,
+          price: 1,
+          market_valuation: null,
+          expenses: [],
+          benefits: [],
+        })),
+      ),
+    ),
     http.post(config.baseUrl + '/api/comparison', () =>
       HttpResponse.json({
         items: [

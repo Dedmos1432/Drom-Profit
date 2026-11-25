@@ -1,0 +1,198 @@
+{
+  "limit": 1000000000000,
+  "http": {
+    "validation_error": 422,
+    "amount_out_of_range": 422,
+    "price_success": 201,
+    "market_valuation_success": 200,
+    "factor_success": 201
+  },
+  "inputs": [
+    {
+      "id": "minimum",
+      "literal": "1",
+      "expect": {
+        "price": null,
+        "market_valuation": null,
+        "amount": null
+      }
+    },
+    {
+      "id": "maximum",
+      "literal": "1000000000000",
+      "expect": {
+        "price": null,
+        "market_valuation": null,
+        "amount": null
+      }
+    },
+    {
+      "id": "above_maximum",
+      "literal": "1000000000001",
+      "expect": {
+        "price": "amount_out_of_range",
+        "market_valuation": "amount_out_of_range",
+        "amount": "amount_out_of_range"
+      }
+    },
+    {
+      "id": "js_boundary",
+      "literal": "9007199254740993",
+      "expect": {
+        "price": "amount_out_of_range",
+        "market_valuation": "amount_out_of_range",
+        "amount": "amount_out_of_range"
+      }
+    },
+    {
+      "id": "above_bigint",
+      "literal": "9223372036854775808",
+      "expect": {
+        "price": "amount_out_of_range",
+        "market_valuation": "amount_out_of_range",
+        "amount": "amount_out_of_range"
+      }
+    },
+    {
+      "id": "zero",
+      "literal": "0",
+      "expect": {
+        "price": "amount_out_of_range",
+        "market_valuation": "amount_out_of_range",
+        "amount": null
+      }
+    },
+    {
+      "id": "minus_zero",
+      "literal": "-0",
+      "expect": {
+        "price": "amount_out_of_range",
+        "market_valuation": "amount_out_of_range",
+        "amount": null
+      }
+    },
+    {
+      "id": "negative",
+      "literal": "-1",
+      "expect": {
+        "price": "amount_out_of_range",
+        "market_valuation": "amount_out_of_range",
+        "amount": "amount_out_of_range"
+      }
+    },
+    {
+      "id": "null",
+      "literal": "null",
+      "expect": {
+        "price": "validation_error",
+        "market_valuation": null,
+        "amount": null
+      }
+    },
+    {
+      "id": "integer",
+      "literal": "2",
+      "expect": {
+        "price": null,
+        "market_valuation": null,
+        "amount": null
+      }
+    },
+    {
+      "id": "decimal_integer",
+      "literal": "2.0",
+      "expect": {
+        "price": "validation_error",
+        "market_valuation": "validation_error",
+        "amount": "validation_error"
+      }
+    },
+    {
+      "id": "fraction",
+      "literal": "1.5",
+      "expect": {
+        "price": "validation_error",
+        "market_valuation": "validation_error",
+        "amount": "validation_error"
+      }
+    },
+    {
+      "id": "near_integer",
+      "literal": "1.0000000000000001",
+      "expect": {
+        "price": "validation_error",
+        "market_valuation": "validation_error",
+        "amount": "validation_error"
+      }
+    },
+    {
+      "id": "exponent",
+      "literal": "1e3",
+      "expect": {
+        "price": "validation_error",
+        "market_valuation": "validation_error",
+        "amount": "validation_error"
+      }
+    },
+    {
+      "id": "numeric_string",
+      "literal": "\"1000\"",
+      "expect": {
+        "price": "validation_error",
+        "market_valuation": "validation_error",
+        "amount": "validation_error"
+      }
+    },
+    {
+      "id": "true",
+      "literal": "true",
+      "expect": {
+        "price": "validation_error",
+        "market_valuation": "validation_error",
+        "amount": "validation_error"
+      }
+    },
+    {
+      "id": "false",
+      "literal": "false",
+      "expect": {
+        "price": "validation_error",
+        "market_valuation": "validation_error",
+        "amount": "validation_error"
+      }
+    },
+    {
+      "id": "omitted",
+      "literal": null,
+      "expect": {
+        "price": "validation_error",
+        "market_valuation": null,
+        "amount": "validation_error"
+      }
+    }
+  ],
+  "mixed": {
+    "price_literal": "1000000000001",
+    "market_valuation_literal": "false",
+    "status": 422,
+    "code": "validation_error"
+  },
+  "aggregates": {
+    "first": 600000000000,
+    "remainder": 400000000000,
+    "overflow": 1,
+    "reject_status": 422,
+    "reject_code": "amount_out_of_range",
+    "preserve_reviewed": true
+  },
+  "derivatives": {
+    "max_price": 1000000000000,
+    "max_expenses": 1000000000000,
+    "min_price": 1,
+    "max_benefits": 1000000000000,
+    "acquisition_cost": 2000000000000,
+    "adjusted_max": 2000000000000,
+    "adjusted_min": -999999999999,
+    "difference_max": 2999999999999
+  }
+}

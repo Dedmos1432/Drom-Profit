@@ -225,6 +225,10 @@ export interface components {
             brand: string | null;
             model: string | null;
             year: number | null;
+            /**
+             * Format: int64
+             * @description Целые рубли. null означает распознанное объявление без цены.
+             */
             price: number | null;
             mileage_km: number | null;
             trim: string | null;
@@ -238,6 +242,10 @@ export interface components {
             image_url: string | null;
             /** Format: uri */
             listing_url: string | null;
+            /**
+             * Format: int64
+             * @description Целые рубли. Только целочисленный JSON-литерал в десятичной записи без дроби, экспоненты и кавычек. -0 эквивалентен 0.
+             */
             market_valuation: number | null;
             /** Format: date-time */
             fetched_at: string | null;
@@ -249,6 +257,10 @@ export interface components {
             brand: string;
             model: string;
             year?: number | null;
+            /**
+             * Format: int64
+             * @description Целые рубли. Только целочисленный JSON-литерал в десятичной записи без дроби, экспоненты и кавычек. -0 эквивалентен 0.
+             */
             price: number;
             mileage_km?: number | null;
             trim?: string | null;
@@ -262,6 +274,10 @@ export interface components {
             image_url?: string | null;
             /** Format: uri */
             listing_url?: string | null;
+            /**
+             * Format: int64
+             * @description Целые рубли. Только целочисленный JSON-литерал в десятичной записи без дроби, экспоненты и кавычек. -0 эквивалентен 0.
+             */
             market_valuation?: number | null;
             /** Format: date-time */
             fetched_at?: string | null;
@@ -270,6 +286,10 @@ export interface components {
             brand?: string;
             model?: string;
             year?: number | null;
+            /**
+             * Format: int64
+             * @description Целые рубли. Только целочисленный JSON-литерал в десятичной записи без дроби, экспоненты и кавычек. -0 эквивалентен 0.
+             */
             price?: number;
             mileage_km?: number | null;
             trim?: string | null;
@@ -283,6 +303,10 @@ export interface components {
             image_url?: string | null;
             /** Format: uri */
             listing_url?: string | null;
+            /**
+             * Format: int64
+             * @description Целые рубли. Только целочисленный JSON-литерал в десятичной записи без дроби, экспоненты и кавычек. -0 эквивалентен 0.
+             */
             market_valuation?: number | null;
             expenses_reviewed?: boolean;
             benefits_reviewed?: boolean;
@@ -298,10 +322,15 @@ export interface components {
         };
         Summary: {
             car_id: string;
+            /** Format: int64 */
             listing_price: number;
+            /** Format: int64 */
             total_expenses: number;
+            /** Format: int64 */
             total_benefits: number;
+            /** Format: int64 */
             acquisition_cost: number;
+            /** Format: int64 */
             adjusted_cost: number;
             /** @enum {string} */
             assessment_status: "complete" | "incomplete";
@@ -313,15 +342,21 @@ export interface components {
         };
         ComparisonItem: {
             car_id: string;
+            /** Format: int64 */
             listing_price: number;
+            /** Format: int64 */
             total_expenses: number;
+            /** Format: int64 */
             total_benefits: number;
+            /** Format: int64 */
             acquisition_cost: number;
+            /** Format: int64 */
             adjusted_cost: number;
             /** @enum {string} */
             assessment_status: "complete" | "incomplete";
             unknown_expenses: number;
             unknown_benefits: number;
+            /** Format: int64 */
             difference_from_min: number | null;
         };
         Warning: {
@@ -338,6 +373,10 @@ export interface components {
             title: string;
             /** @enum {string} */
             kind: "repair" | "maintenance" | "missing_equipment" | "other";
+            /**
+             * Format: int64
+             * @description Целые рубли. Только целочисленный JSON-литерал в десятичной записи без дроби, экспоненты и кавычек. -0 эквивалентен 0.
+             */
             amount: number | null;
             factor_key?: string | null;
             comment?: string | null;
@@ -346,6 +385,10 @@ export interface components {
             title?: string;
             /** @enum {string} */
             kind?: "repair" | "maintenance" | "missing_equipment" | "other";
+            /**
+             * Format: int64
+             * @description Целые рубли. Только целочисленный JSON-литерал в десятичной записи без дроби, экспоненты и кавычек. -0 эквивалентен 0.
+             */
             amount?: number | null;
             factor_key?: string | null;
             comment?: string | null;
@@ -355,18 +398,30 @@ export interface components {
             title: string;
             /** @enum {string} */
             kind: "repair" | "maintenance" | "missing_equipment" | "other";
+            /**
+             * Format: int64
+             * @description Целые рубли. Только целочисленный JSON-литерал в десятичной записи без дроби, экспоненты и кавычек. -0 эквивалентен 0.
+             */
             amount: number | null;
             factor_key: string | null;
             comment: string | null;
         };
         BenefitInput: {
             title: string;
+            /**
+             * Format: int64
+             * @description Целые рубли. Только целочисленный JSON-литерал в десятичной записи без дроби, экспоненты и кавычек. -0 эквивалентен 0.
+             */
             amount: number | null;
             factor_key?: string | null;
             comment?: string | null;
         };
         BenefitPatch: {
             title?: string;
+            /**
+             * Format: int64
+             * @description Целые рубли. Только целочисленный JSON-литерал в десятичной записи без дроби, экспоненты и кавычек. -0 эквивалентен 0.
+             */
             amount?: number | null;
             factor_key?: string | null;
             comment?: string | null;
@@ -374,6 +429,10 @@ export interface components {
         Benefit: {
             id: string;
             title: string;
+            /**
+             * Format: int64
+             * @description Целые рубли. Только целочисленный JSON-литерал в десятичной записи без дроби, экспоненты и кавычек. -0 эквивалентен 0.
+             */
             amount: number | null;
             factor_key: string | null;
             comment: string | null;
@@ -401,6 +460,10 @@ export interface components {
             brand: string;
             model: string;
             year: number | null;
+            /**
+             * Format: int64
+             * @description Целые рубли. Только целочисленный JSON-литерал в десятичной записи без дроби, экспоненты и кавычек. -0 эквивалентен 0.
+             */
             price: number;
             mileage_km: number | null;
             trim: string | null;
@@ -414,6 +477,10 @@ export interface components {
             image_url: string | null;
             /** Format: uri */
             listing_url: string | null;
+            /**
+             * Format: int64
+             * @description Целые рубли. Только целочисленный JSON-литерал в десятичной записи без дроби, экспоненты и кавычек. -0 эквивалентен 0.
+             */
             market_valuation: number | null;
             /** Format: date-time */
             fetched_at: string | null;
@@ -543,7 +610,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Error */
+            /** @description parse_error при нераспознанном объявлении, некорректной цене либо неподдерживаемой валюте. */
             502: {
                 headers: {
                     [name: string]: unknown;
@@ -668,7 +735,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Error */
+            /** @description validation_error при некорректной структуре или денежном литерале. amount_out_of_range при выходе за денежный диапазон. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -844,7 +911,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Error */
+            /** @description validation_error при некорректной структуре или денежном литерале. amount_out_of_range при выходе за денежный диапазон. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -906,7 +973,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Error */
+            /** @description validation_error при некорректной структуре или денежном литерале. amount_out_of_range при выходе за денежный диапазон поля или суммы группы. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1026,7 +1093,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Error */
+            /** @description validation_error при некорректной структуре или денежном литерале. amount_out_of_range при выходе за денежный диапазон поля или суммы группы. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1088,7 +1155,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Error */
+            /** @description validation_error при некорректной структуре или денежном литерале. amount_out_of_range при выходе за денежный диапазон поля или суммы группы. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1208,7 +1275,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Error */
+            /** @description validation_error при некорректной структуре или денежном литерале. amount_out_of_range при выходе за денежный диапазон поля или суммы группы. */
             422: {
                 headers: {
                     [name: string]: unknown;

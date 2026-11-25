@@ -1,11 +1,10 @@
 import { z } from 'zod';
+import { positiveMoney, rublesText } from '@/shared/api/money';
 import type { CarInput, CarPatch } from './api';
 
 const brand = z.string().trim().min(1, 'Укажите марку.');
 const model = z.string().trim().min(1, 'Укажите модель.');
-const price = z
-  .int({ error: 'Укажите цену целым числом.' })
-  .positive('Цена должна быть больше нуля.');
+const price = positiveMoney;
 const year = z
   .int({ error: 'Год должен быть целым числом.' })
   .min(1886, 'Укажите год не раньше 1886.');
@@ -56,7 +55,7 @@ export const carInputSchema = z.strictObject({
   city: z.string().nullable().optional(),
   image_url: uri.nullable().optional(),
   listing_url: uri.nullable().optional(),
-  market_valuation: nonnegativeInteger.nullable().optional(),
+  market_valuation: positiveMoney.nullable().optional(),
 }) satisfies z.ZodType<CarInput>;
 
 export const carPatchSchema = carInputSchema
@@ -86,7 +85,7 @@ function optionalNumber(schema: z.ZodType<number, number>) {
 export const carFormSchema = z.object({
   brand,
   model,
-  price: z.string().trim().transform(parseNumber).pipe(price),
+  price: rublesText.pipe(price),
   year: optionalNumber(year),
   mileage_km: optionalNumber(nonnegativeInteger),
   trim: optionalText,
@@ -98,7 +97,19 @@ export const carFormSchema = z.object({
   city: optionalText,
   image_url: optionalText.pipe(uri.nullable()),
   listing_url: optionalText.pipe(uri.nullable()),
-  market_valuation: optionalNumber(nonnegativeInteger),
+  market_valuation: z
+    .string()
+    .transform((value, ctx) => {
+      if (!value.trim()) return null;
+      const result = rublesText.safeParse(value);
+      if (result.success) return result.data;
+      ctx.addIssue({
+        code: 'custom',
+        message: result.error.issues[0]?.message ?? 'Проверьте сумму.',
+      });
+      return z.NEVER;
+    })
+    .pipe(positiveMoney.nullable()),
 });
 
 export type CarFormValues = z.input<typeof carFormSchema>;

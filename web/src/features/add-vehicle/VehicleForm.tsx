@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import type { Car, CarInput, CarPatch, Listing } from '@/entities/vehicle/api';
 import { carFormSchema } from '@/entities/vehicle/validation';
 import type { CarFormValues, ValidCarForm } from '@/entities/vehicle/validation';
+import { ApiError } from '@/shared/api/client';
 import { changedFields } from '@/shared/lib/changed-fields';
 import { Alert, Button, Inline, Input, Stack } from '@/shared/ui';
 import styles from './VehicleForm.module.css';
@@ -57,14 +58,14 @@ function initialValues(listing?: Listing | Car): CarFormValues {
 
 type VehicleFormProps = {
   saving?: boolean;
-  failed?: boolean;
+  failure?: Error | null;
 } & (
   | { car?: never; listing?: Listing; onSave: (input: CarInput) => Promise<void> }
   | { car: Car; listing?: never; onSave: (patch: CarPatch) => Promise<void>; onCancel: () => void }
 );
 
 export function VehicleForm(props: VehicleFormProps) {
-  const { car, listing, saving, failed } = props;
+  const { car, listing, saving, failure } = props;
   const baseline = useRef(car).current;
   const locked = useRef(false);
   const {
@@ -116,9 +117,11 @@ export function VehicleForm(props: VehicleFormProps) {
         {group('Основные данные', basics)}
         {group('Характеристики', specifications)}
         {group('Объявление и фото', source)}
-        {failed && (
+        {failure && (
           <Alert tone="error" title="Не удалось сохранить автомобиль" role="alert">
-            Введённые данные сохранены в форме. Повторите попытку.
+            {failure instanceof ApiError && failure.code === 'amount_out_of_range'
+              ? failure.message
+              : 'Введённые данные сохранены в форме. Повторите попытку.'}
           </Alert>
         )}
         <Inline gap="tight">

@@ -117,15 +117,13 @@ def test_drom_provider_rejects_an_empty_listing():
 @pytest.mark.parametrize(
     "offer",
     [
-        {},
-        {"priceCurrency": "RUB"},
         {"price": 500000},
         {"price": 500000, "priceCurrency": "USD"},
         {"price": 0, "priceCurrency": "RUB"},
     ],
-    ids=["no-offer", "no-price", "no-currency", "foreign-currency", "zero-price"],
+    ids=["no-currency", "foreign-currency", "zero-price"],
 )
-def test_drom_provider_requires_confirmed_ruble_price_even_with_brand_and_model(offer):
+def test_drom_provider_rejects_an_invalid_price_even_with_brand_and_model(offer):
     vehicle = {"@type": "Car", "sku": TARGET.listing_id, "brand": "Demo", "model": "Example"}
     if offer:
         vehicle["offers"] = offer
@@ -135,6 +133,15 @@ def test_drom_provider_requires_confirmed_ruble_price_even_with_brand_and_model(
     with pytest.raises(ListingImportError) as error:
         asyncio.run(ListingImporter(provider)(URL))
     assert error.value.code == "parse_error"
+
+
+@pytest.mark.parametrize("offer", [None, {}, {"priceCurrency": "RUB"}, {"price": None}])
+def test_recognized_listing_can_be_imported_without_a_price(offer):
+    vehicle = {"@type": "Car", "sku": TARGET.listing_id, "brand": "Demo", "model": "Example"}
+    if offer is not None:
+        vehicle["offers"] = offer
+    listing = listing_from_html(page(vehicle), TARGET)
+    assert (listing.brand, listing.model, listing.price) == ("Demo", "Example", None)
 
 
 def test_drom_provider_is_disabled_without_approval():
