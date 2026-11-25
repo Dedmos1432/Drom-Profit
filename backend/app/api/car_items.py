@@ -59,7 +59,8 @@ def update_item(db: Session, car: Car, item: Item, changes: dict) -> Item:
         if not isinstance(item, Note):
             validate_factors(car)
         reset_review(car, item)
-        db.commit()
+    # A no-op still holds the car lock acquired by the caller until the transaction ends.
+    db.commit()
     return item
 
 

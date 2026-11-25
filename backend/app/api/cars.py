@@ -4,7 +4,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from .. import schemas
-from ..db import Database, Snapshot
+from ..db import Database, session_for
 from ..errors import APIError, not_found
 from ..formats import validate_uri
 from ..models import Car
@@ -51,9 +51,11 @@ def create_car(body: schemas.CarInput, db: Database, owner: Owner) -> schemas.Ca
 
 
 @router.get("/cars")
-def list_cars(db: Snapshot, owner: Owner) -> list[schemas.Car]:
-    cars = db.scalars(select(Car).where(Car.session_id == owner).order_by(Car.id))
-    return [schemas.Car.model_validate(car) for car in cars]
+def list_cars(request: Request, owner: Owner) -> list[schemas.Car]:
+    # Materialize the result and return the connection before FastAPI schedules response validation.
+    with session_for(request.app.state.snapshot_engine) as db:
+        cars = db.scalars(select(Car).where(Car.session_id == owner).order_by(Car.id))
+        return [schemas.Car.model_validate(car) for car in cars]
 
 
 def require_car(car_id: str, db: Session, owner: str, *, lock: bool = False) -> Car:
@@ -68,8 +70,9 @@ def require_car(car_id: str, db: Session, owner: str, *, lock: bool = False) -> 
 
 
 @router.get("/cars/{car_id}")
-def get_car(car_id: str, db: Snapshot, owner: Owner) -> schemas.Car:
-    return schemas.Car.model_validate(require_car(car_id, db, owner))
+def get_car(car_id: str, request: Request, owner: Owner) -> schemas.Car:
+    with session_for(request.app.state.snapshot_engine) as db:
+        return schemas.Car.model_validate(require_car(car_id, db, owner))
 
 
 @router.patch("/cars/{car_id}")
@@ -96,16 +99,18 @@ def delete_car(car_id: str, db: Database, owner: Owner) -> Response:
 
 
 @router.get("/cars/{car_id}/summary")
-def car_summary(car_id: str, db: Snapshot, owner: Owner) -> schemas.Summary:
-    return summarize(require_car(car_id, db, owner))
+def car_summary(car_id: str, request: Request, owner: Owner) -> schemas.Summary:
+    with session_for(request.app.state.snapshot_engine) as db:
+        return summarize(require_car(car_id, db, owner))
 
 
 @router.post("/comparison")
-def comparison(body: schemas.ComparisonRequest, db: Snapshot, owner: Owner) -> schemas.Comparison:
-    cars = db.scalars(
-        select(Car).where(Car.session_id == owner, Car.id.in_(body.car_ids))
-    )
-    by_id = {car.id: car for car in cars}
-    if len(by_id) != len(body.car_ids):
-        raise not_found()
-    return compare([by_id[car_id] for car_id in body.car_ids])
+def comparison(body: schemas.ComparisonRequest, request: Request, owner: Owner) -> schemas.Comparison:
+    with session_for(request.app.state.snapshot_engine) as db:
+        cars = db.scalars(
+            select(Car).where(Car.session_id == owner, Car.id.in_(body.car_ids))
+        )
+        by_id = {car.id: car for car in cars}
+        if len(by_id) != len(body.car_ids):
+            raise not_found()
+        return compare([by_id[car_id] for car_id in body.car_ids])

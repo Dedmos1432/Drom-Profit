@@ -121,7 +121,7 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 Синхронные обработчики FastAPI используют SQLAlchemy и Psycopg в рабочих потоках. Проверка Bearer завершается до выполнения бизнес-операции. Она освобождает соединение до ожидания асинхронного импортера. Пул общий для чтения и записи.
 
-Изменение карточки или вложенного объекта выполняется в `READ COMMITTED`. Первым блокируется принадлежащий владельцу автомобиль через `SELECT … FOR UPDATE`. Расходы, преимущества и заметки загружаются после блокировки. Денежный фактор и сброс подтверждения фиксируются вместе. Операция записи затрагивает одну карточку, ожидание ее блокировки ограничено 3 с. Список, саммари и сравнение читают все части ответа в одной транзакции `REPEATABLE READ READ ONLY`.
+Изменение карточки или вложенного объекта выполняется в `READ COMMITTED`. Первым блокируется принадлежащий владельцу автомобиль через `SELECT … FOR UPDATE`. Расходы, преимущества и заметки загружаются после блокировки. Денежный фактор и сброс подтверждения фиксируются вместе. Операция записи затрагивает одну карточку, ожидание ее блокировки ограничено 3 с. Список, карточка, саммари и сравнение формируют весь результат в одной транзакции `REPEATABLE READ READ ONLY`. Обработчик закрывает сессию чтения и возвращает соединение до валидации HTTP-ответа. PATCH вложенного объекта завершает транзакцию даже при совпадении переданных полей. В этом случае подтверждения сохраняются.
 
 ### Перенос существующих данных
 
@@ -176,10 +176,9 @@ docker compose -p drom-mvp-integration --profile test up -d --wait postgres-test
 docker compose -p drom-mvp-integration --profile test run --rm --no-deps tests python -m pytest --collect-only -q -p no:cacheprovider
 docker compose -p drom-mvp-integration --profile test run --rm --no-deps tests
 docker compose -p drom-mvp-integration --profile test run --rm --no-deps tests python -m pytest -q -p no:cacheprovider tests/listings/test_listings_http_worker.py
-docker compose -p drom-mvp-integration --profile test run --rm --no-deps tests python -m pytest -q -s -p no:cacheprovider tests/load_postgres.py -k 'not 100'
 docker compose -p drom-mvp-integration --profile test stop postgres-test
 ```
 
 Единый прогон собирает тесты Core, `tests/listings` и `tests/test_listing_integration.py`. Общий `conftest.py` использует `socket.AF_UNIX`. Для полного прогона на Windows используйте Linux-контейнеры. Отдельные тесты Parser могут запускаться без PostgreSQL в его исходном Python-окружении.
 
-Нагрузка поднимает Uvicorn внутри тестового контейнера. Сценарии используют 1, 10, 50 и 100 конкурентных пользователей, по умолчанию по 5 циклов и 9 запросов за цикл. JSON-отчет содержит среднее время ответа, медиану, P95, P99, RPS, успешность, ошибки, конфликты и параметры среды. Для другого числа циклов задайте `DROM_LOAD_ROUNDS`.
+Для нагрузочной проверки используйте отдельный Compose-проект `drom-mvp-performance`. Явный запуск `tests/load_postgres.py` поднимает один Uvicorn внутри Linux-контейнера. По умолчанию проверяются 1, 10, 25, 50, 75 и 100 конкурентных клиентов, по 5 сценариев и 9 запросов за сценарий. Настройки `DROM_LOAD_CLIENTS`, `DROM_LOAD_ROUNDS` и `DROM_LOAD_WAVES` задают состав прогона. JSON содержит задержки по маршрутам, RPS, HTTP-статусы, SQLSTATE и метрики пула, потоков и процесса. [Команды и результаты этапа 8.6.1](../docs/BACKEND_PERFORMANCE.md#воспроизведение)

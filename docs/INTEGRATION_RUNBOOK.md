@@ -66,6 +66,10 @@ npm.cmd run dev -- --host localhost --port 5173 --strictPort
 
 Подготовьте обезличенный HTML и укажите фактическую кодировку в локальном манифесте. Проверка запускается из `backend/` без PostgreSQL, Vite и доступа к Дрому. [Манифест и команда](REAL_LISTING_VALIDATION.md#локальное-воспроизведение)
 
+## Нагрузочная проверка Backend
+
+Запускайте `tests/load_postgres.py` в отдельном Compose-проекте `drom-mvp-performance` с `postgres-test`. Тестовый Uvicorn доступен по loopback внутри контейнера. Порты Backend и PostgreSQL для этой проверки не нужны. Для повторных волн задайте `DROM_LOAD_CLIENTS=50,100` и `DROM_LOAD_WAVES=2` через `docker compose run -e`. Проверьте полноту сценариев, HTTP-ошибки, `pool_timeouts`, `after_wave.checked_out`, `after_wave.pool_waiters` и отсутствие `idle in transaction` по завершении каждой волны. [Команды, диагностика и ограничения](BACKEND_PERFORMANCE.md)
+
 ## Остановка
 
 Остановите Vite через Ctrl+C. Из `backend/` остановите и удалите контейнеры своего проекта, сохранив данные в томе.

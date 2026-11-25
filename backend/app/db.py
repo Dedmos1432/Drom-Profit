@@ -64,10 +64,4 @@ def get_db(request: Request) -> Iterator[Session]:
         yield session
 
 
-def get_snapshot(request: Request) -> Iterator[Session]:
-    with session_for(request.app.state.snapshot_engine) as session:
-        yield session
-
-
 Database = Annotated[Session, Depends(get_db, scope="function")]
-Snapshot = Annotated[Session, Depends(get_snapshot, scope="function")]

@@ -156,3 +156,98 @@ def test_failed_commit_undoes_factor_and_flag(sql_engine, db_url, headers, new_c
         saved = client.get(path, headers=headers).json()
         assert saved["expenses"] == [] and saved["expenses_reviewed"]
         assert client.post(path + "/expenses", headers=headers, json=body | {"title": "OK"}).status_code == 201
+
+
+@pytest.mark.parametrize("contender", ["review", "edit"])
+def test_expense_edit_serializes_with_review_or_second_edit(
+    client, headers, new_car, monkeypatch, contender
+):
+    from app.api import car_items
+
+    car = new_car()
+    created = client.post(
+        car + "/expenses", headers=headers, json={"title": "Ремонт", "kind": "repair", "amount": 10}
+    )
+    assert created.status_code == 201
+    path = f"{car}/expenses/{created.json()['id']}"
+    assert client.patch(car, headers=headers, json={"expenses_reviewed": True}).status_code == 200
+    first_holds_lock, contender_at_lock, release = Event(), Event(), Event()
+    reset_review = car_items.reset_review
+
+    def wait_before_commit(row, item):
+        reset_review(row, item)
+        if item.amount == 30:
+            first_holds_lock.set()
+            assert release.wait(8)
+
+    monkeypatch.setattr(car_items, "reset_review", wait_before_commit)
+
+    @event.listens_for(client.app.state.engine, "before_cursor_execute")
+    def observe_contender(_conn, _cursor, statement, _params, _context, _many):
+        if first_holds_lock.is_set() and "FOR UPDATE" in statement:
+            contender_at_lock.set()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(client.patch, path, headers=headers, json={"amount": 30})
+        try:
+            assert first_holds_lock.wait(5)
+            second_path, changes = (
+                (car, {"expenses_reviewed": True}) if contender == "review" else (path, {"amount": 40})
+            )
+            second = pool.submit(client.patch, second_path, headers=headers, json=changes)
+            assert contender_at_lock.wait(5)
+            assert not second.done()
+        finally:
+            release.set()
+        assert first.result(timeout=5).status_code == second.result(timeout=5).status_code == 200
+
+    saved = client.get(car, headers=headers).json()
+    assert saved["expenses_reviewed"] == (contender == "review")
+    assert saved["expenses"][0]["amount"] == (30 if contender == "review" else 40)
+
+
+def test_two_concurrent_expenses_are_saved_and_reset_confirmation(client, headers, new_car):
+    car = new_car()
+    assert client.patch(car, headers=headers, json={"expenses_reviewed": True}).status_code == 200
+    start = Barrier(2, timeout=5)
+
+    def add_expense(title, amount):
+        start.wait()
+        return client.post(
+            car + "/expenses", headers=headers, json={"title": title, "kind": "repair", "amount": amount},
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(add_expense, "Ремонт", 30)
+        second = pool.submit(add_expense, "Диагностика", 40)
+        assert first.result(timeout=5).status_code == second.result(timeout=5).status_code == 201
+
+    saved = client.get(car, headers=headers).json()
+    assert sorted(item["amount"] for item in saved["expenses"]) == [30, 40]
+    assert not saved["expenses_reviewed"]
+    assert client.get(car + "/summary", headers=headers).json()["total_expenses"] == 70
+
+
+def test_card_snapshot_survives_concurrent_deletion(client, headers, new_car):
+    car = new_car()
+    note = client.post(car + "/notes", headers=headers, json={"kind": "inspection", "text": "Осмотр"})
+    assert note.status_code == 201
+    parent_read, resume = Event(), Event()
+
+    @event.listens_for(client.app.state.engine, "after_cursor_execute")
+    def pause_snapshot(conn, _cursor, statement, _params, _context, _many):
+        if conn.get_execution_options().get("postgresql_readonly") and "FROM cars" in statement:
+            parent_read.set()
+            assert resume.wait(8)
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        snapshot = pool.submit(client.get, car, headers=headers)
+        try:
+            assert parent_read.wait(5)
+            assert client.delete(car, headers=headers).status_code == 204
+        finally:
+            resume.set()
+        response = snapshot.result(timeout=5)
+    assert response.status_code == 200
+    assert response.json()["notes"] == [note.json()]
+    assert client.get(car, headers=headers).status_code == 404
