@@ -15,7 +15,7 @@ from .errors import ListingImportError
 
 MAX_URL_LENGTH = 2048
 _LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
-_PATH = re.compile(r"(?:/[A-Za-z0-9_.-]+)+\.html")
+_PATH = re.compile(r"(?:/[A-Za-z0-9_.~-]+)+\.html")
 _LISTING_ID = re.compile(r"/(\d{4,12})\.html$")
 
 

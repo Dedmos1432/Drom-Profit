@@ -14,6 +14,14 @@ def test_canonical_url_drops_query_and_fragment():
     assert result.listing_id == "123456789"
 
 
+def test_accepts_tilde_in_model_path_without_changing_the_listing_identity():
+    result = validate_listing_url(
+        "https://auto.drom.ru/test/brand/model~name/12345678.html?ref=test#photos", HOSTS
+    )
+    assert result.canonical == "https://auto.drom.ru/test/brand/model~name/12345678.html"
+    assert result.listing_id == "12345678"
+
+
 def test_demo_path_has_no_numeric_listing_id():
     assert validate_listing_url("https://auto.drom.ru/demo/1.html", HOSTS).listing_id is None
 

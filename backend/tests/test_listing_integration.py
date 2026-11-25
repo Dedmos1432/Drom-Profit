@@ -200,6 +200,36 @@ def test_waiting_import_does_not_hold_pg_connection(db_url):
         assert pending.result(timeout=5).status_code == 200
 
 
+
+def test_saved_drom_document_through_core_adapter(db_url):
+    from pathlib import Path
+
+    from app.services.listing_import import adapt_parser
+    from app.services.listings.drom_provider import listing_from_html
+    from app.services.listings.urls import HostAllowlist, validate_listing_url
+
+    url = "https://vladivostok.drom.ru/toyota/camry/12345678.html"
+    hosts = HostAllowlist(("vladivostok.drom.ru",))
+    html = (Path(__file__).parent / "listings/samples/synthetic_listing.html").read_text("utf-8")
+
+    async def parse_saved_document(requested_url):
+        return listing_from_html(html, validate_listing_url(requested_url, hosts))
+
+    with TestClient(create_app(db_url, importer=adapt_parser(parse_saved_document))) as client:
+        headers = session_headers(client)
+        preview = client.post(PREVIEW, headers=headers, json={"url": url})
+        assert preview.status_code == 200
+        listing = preview.json()
+        assert len(listing) == 18
+        assert (listing["source"], listing["listing_id"], listing["price"]) == (
+            "drom", "12345678", 1200000,
+        )
+        assert client.get(CARS, headers=headers).json() == []
+        saved = client.post(CARS, headers=headers, json=listing)
+        assert saved.status_code == 201
+        assert saved.json()["listing_url"] == url
+
+
 def test_import_to_comparison_and_restart(db_url):
     with TestClient(create_app(db_url)) as client:
         headers = session_headers(client)

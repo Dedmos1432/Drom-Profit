@@ -75,6 +75,12 @@ it.each([
   expect(listingUrlSchema.safeParse(url).success).toBe(false);
 });
 
+it('accepts the unreserved tilde in a listing path on the allowed host', () => {
+  const url = 'https://auto.drom.ru/city/brand/model~name/12345678.html';
+  expect(listingUrlSchema.parse(url + '?ref=test#photo')).toBe(url + '?ref=test#photo');
+  expect(canonicalDemoListingUrl(url + '?ref=test#photo')).toBe(url);
+});
+
 it('accepts a demo link and rejects invalid or unrelated links safely', () => {
   expect(listingUrlSchema.safeParse('https://auto.drom.ru/demo/1.html').success).toBe(true);
   expect(listingUrlSchema.safeParse('not a URL').success).toBe(false);

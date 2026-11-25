@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from app.services.listings.drom_provider import DromHtmlProvider
+from app.services.listings.drom_provider import DromHtmlProvider, listing_from_html
 from app.services.listings.errors import ListingImportError
 from app.services.listings.html_parser import _image_urls, extract_listing_fields
 from app.services.listings.importer import ListingImporter
@@ -106,9 +106,32 @@ def test_drom_provider_end_to_end_without_network():
     assert data["fetched_at"].endswith("+00:00")
 
 
-def test_drom_provider_requires_some_core_fields():
+def test_drom_provider_rejects_an_empty_listing():
     empty = page({"@type": "Car", "sku": TARGET.listing_id}).encode()
     provider = DromHtmlProvider(access_approved=True, allowed_hosts=HOSTS, client=FakeClient(empty))
+    with pytest.raises(ListingImportError) as error:
+        asyncio.run(ListingImporter(provider)(URL))
+    assert error.value.code == "parse_error"
+
+
+@pytest.mark.parametrize(
+    "offer",
+    [
+        {},
+        {"priceCurrency": "RUB"},
+        {"price": 500000},
+        {"price": 500000, "priceCurrency": "USD"},
+        {"price": 0, "priceCurrency": "RUB"},
+    ],
+    ids=["no-offer", "no-price", "no-currency", "foreign-currency", "zero-price"],
+)
+def test_drom_provider_requires_confirmed_ruble_price_even_with_brand_and_model(offer):
+    vehicle = {"@type": "Car", "sku": TARGET.listing_id, "brand": "Demo", "model": "Example"}
+    if offer:
+        vehicle["offers"] = offer
+    provider = DromHtmlProvider(
+        access_approved=True, allowed_hosts=HOSTS, client=FakeClient(page(vehicle).encode()),
+    )
     with pytest.raises(ListingImportError) as error:
         asyncio.run(ListingImporter(provider)(URL))
     assert error.value.code == "parse_error"
@@ -137,6 +160,7 @@ def test_drom_provider_is_disabled_without_approval():
 def test_quantities_require_known_units(mileage, volume, power, expected):
     html = page({
         "@type": "Car", "sku": TARGET.listing_id, "brand": "Demo",
+        "offers": {"price": 700000, "priceCurrency": "RUB"},
         "mileageFromOdometer": mileage,
         "vehicleEngine": {"engineDisplacement": volume, "enginePower": power},
     })
@@ -201,7 +225,9 @@ def test_refuses_ambiguous_or_mismatched_listing_data(vehicle):
 
 def test_public_result_skips_invalid_first_image_and_uses_relative_candidate():
     html = '<meta property="og:image" content="https://img.example.test/fallback.jpg">' + page({
-        "@type": "Car", "url": URL, "brand": "Demo", "image": [
+        "@type": "Car", "url": URL, "brand": "Demo",
+        "offers": {"price": 700000, "priceCurrency": "RUB"},
+        "image": [
             "http://img.example.test/rejected.jpg",
             {"url": "https://", "contentUrl": "/gallery/main.jpg"},
             "https://img.example.test/second.jpg",
@@ -243,3 +269,88 @@ def test_og_image_is_a_fallback_and_absence_is_allowed(metas, expected):
         target=TARGET,
     )
     assert raw["image_url"] == expected
+
+
+
+def test_matches_explicit_offer_and_reads_only_the_bulletin_markup():
+    html = f"""
+    <link rel="canonical" href="{URL}">
+    <meta property="og:url" content="{URL}">
+    <table data-ftid="bulletin-specifications">
+      <tr data-ftid="specification-engine"><th>Двигатель</th><td data-ftid="value">дизель, 2,4 л</td></tr>
+      <tr data-ftid="specification-power"><td data-ftid="value">
+        <style>.text {{ color: red }}</style><span>125 л.с.</span>,&nbsp;<button>налог</button>
+      </td></tr>
+      <tr data-ftid="specification-complectation"><td data-ftid="value">Комплектация A</td></tr>
+      <tr data-ftid="specification-drive"><td data-ftid="value">4WD</td></tr>
+      <tr data-ftid="specification-transmission"><td data-ftid="value">АКПП</td></tr>
+    </table>
+    <div data-ftid="bulletin-description">
+      <div data-ftid="city"><span data-ftid="property">Город:</span><span data-ftid="value">Тестовый город</span></div>
+    </div>
+    <div data-ftid="city"><span data-ftid="value">Вне объявления</span></div>
+    <div data-ftid="bull-page_bull-gallery_thumbnails">
+      <a data-ga-stats-name="gallery-thumbnail" href="/gallery/one.jpg"></a>
+      <a data-ga-stats-name="gallery-thumbnail" href="/gallery/two.jpg"></a>
+      <a data-ga-stats-name="gallery-thumbnail" href="/gallery/one.jpg#preview"></a>
+    </div>
+    <a data-ga-stats-name="gallery-thumbnail" href="/gallery/recommended.jpg"></a>
+    """ + page({
+        "@graph": [
+            {"@type": "Car", "brand": "Other", "offers": {"url": "/other/98765432.html"}},
+            {
+                "@type": "Car", "brand": "Sample", "model": "Example",
+                "image": {"url": "/gallery/social.jpg"},
+                "offers": {"@type": "Offer", "url": URL, "price": 700000, "priceCurrency": "RUB"},
+            },
+        ],
+    })
+    raw = extract_listing_fields(html, target=TARGET)
+    listing = listing_from_html(html, TARGET)
+    assert (listing.listing_id, listing.brand, listing.price) == (TARGET.listing_id, "Sample", 700000)
+    assert (listing.fuel_type, listing.engine_volume_l, listing.power_hp) == ("Дизель", 2.4, 125)
+    assert (listing.trim, listing.drive_type, listing.transmission, listing.city) == (
+        "Комплектация A", "Полный", "Автомат", "Тестовый город",
+    )
+    assert raw["image_urls"] == (
+        "https://vladivostok.drom.ru/gallery/one.jpg",
+        "https://vladivostok.drom.ru/gallery/two.jpg",
+    )
+    assert "image_urls" not in listing.as_dict()
+
+
+def test_matching_offer_cannot_overrule_an_explicitly_mismatched_vehicle():
+    html = page({
+        "@type": "Car", "sku": "98765432", "brand": "Wrong",
+        "offers": {"url": URL, "price": 700000, "priceCurrency": "RUB"},
+    })
+    with pytest.raises(ListingImportError, match="parse_error"):
+        extract_listing_fields(html, target=TARGET)
+
+
+def test_conflicting_page_identity_cannot_supply_fallback_fields():
+    html = '<link rel="canonical" href="/other/98765432.html">' + page({
+        "@type": "Car", "sku": TARGET.listing_id,
+        "offers": {"url": URL, "price": 700000, "priceCurrency": "RUB"},
+    })
+    with pytest.raises(ListingImportError, match="parse_error"):
+        extract_listing_fields(html, target=TARGET)
+
+
+def test_unverified_page_markup_does_not_override_structured_values():
+    table = """
+    <table data-ftid="bulletin-specifications">
+      <tr data-ftid="specification-drive"><td data-ftid="value">4WD</td></tr>
+      <tr data-ftid="specification-power"><td data-ftid="value">180 л.с.</td></tr>
+    </table>
+    """
+    car = page({
+        "@type": "Car", "sku": TARGET.listing_id,
+        "offers": {"price": 700000, "priceCurrency": "RUB"},
+        "driveWheelConfiguration": "FrontWheelDriveConfiguration",
+        "vehicleEngine": {"enginePower": {"value": 180, "unitCode": "unknown"}},
+    })
+    listing = listing_from_html(f'<link rel="canonical" href="{URL}">' + table + car, TARGET)
+    assert listing.drive_type == "Передний"
+    assert listing.power_hp is None
+    assert listing_from_html(table + car, TARGET).power_hp is None

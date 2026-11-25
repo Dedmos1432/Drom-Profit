@@ -14,6 +14,7 @@ from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import urljoin, urlsplit
 
+from .drom_markup import DromPageMarkup
 from .errors import ListingImportError
 from .normalize import https_url
 from .urls import HostAllowlist, ListingUrl, validate_listing_url
@@ -39,6 +40,7 @@ class _Collector(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.json_ld: list[str] = []
         self.og_images: list[str] = []
+        self.page_urls: list[str] = []
         self._in_json_ld = False
         self._buffer: list[str] = []
 
@@ -46,10 +48,15 @@ class _Collector(HTMLParser):
         values = {key.lower(): (value or "") for key, value in attrs}
         if tag == "script" and values.get("type", "").strip().lower() == "application/ld+json":
             self._in_json_ld, self._buffer = True, []
+        elif tag == "link" and "canonical" in values.get("rel", "").lower().split():
+            if values.get("href"):
+                self.page_urls.append(values["href"])
         elif tag == "meta":
             key = (values.get("property") or values.get("name") or "").lower()
-            if key == "og:image" and "content" in values:
+            if key == "og:image" and values.get("content"):
                 self.og_images.append(values["content"])
+            elif key == "og:url" and values.get("content"):
+                self.page_urls.append(values["content"])
 
     def handle_endtag(self, tag: str) -> None:
         if tag == "script" and self._in_json_ld:
@@ -156,12 +163,32 @@ def _identity(item: dict[str, Any], target: ListingUrl) -> bool | None:
     return all(matches) if matches else None
 
 
-def _select_vehicle(candidates: list[dict[str, Any]], target: ListingUrl | None) -> dict[str, Any]:
-    if target is not None:
-        candidates = [item for item in candidates if _identity(item, target) is True]
-    if len(candidates) != 1:
+def _offer_identity(offer: dict[str, Any], target: ListingUrl) -> bool | None:
+    signals = [_identity(offer, target)]
+    offered = offer.get("itemOffered")
+    if isinstance(offered, dict):
+        signals.append(_identity(offered, target))
+    return False if False in signals else True if True in signals else None
+
+
+def _select_vehicle(
+    candidates: list[dict[str, Any]], target: ListingUrl | None
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    matched: list[tuple[dict[str, Any], dict[str, Any] | None]] = []
+    for item in candidates:
+        if target is None or (identity := _identity(item, target)) is True:
+            matched.append((item, None))
+        elif identity is None:
+            try:
+                offer = _offer(item, target)
+            except ListingImportError:
+                continue
+            if _offer_identity(offer, target) is True:
+                matched.append((item, offer))
+    if len(matched) != 1:
         raise ListingImportError("parse_error", "автомобиль не удалось однозначно связать с объявлением")
-    return candidates[0]
+    vehicle, offer = matched[0]
+    return vehicle, _offer(vehicle, target) if offer is None else offer
 
 
 def _offer(item: dict[str, Any], target: ListingUrl | None) -> dict[str, Any]:
@@ -185,13 +212,7 @@ def _offer(item: dict[str, Any], target: ListingUrl | None) -> dict[str, Any]:
         return {}
 
     if target is not None:
-        identities: list[bool | None] = []
-        for offer in offers:
-            offered = offer.get("itemOffered")
-            signals = [_identity(offer, target)]
-            if isinstance(offered, dict):
-                signals.append(_identity(offered, target))
-            identities.append(False if False in signals else True if True in signals else None)
+        identities = [_offer_identity(offer, target) for offer in offers]
         matched = [offer for offer, identity in zip(offers, identities) if identity is True]
         if matched:
             offers = matched
@@ -283,8 +304,14 @@ def extract_listing_fields(html: str, *, target: ListingUrl | None = None) -> di
             raise ListingImportError("source_forbidden", "страница проверки или блокировки")
         raise ListingImportError("parse_error", "нет структурированных данных автомобиля")
 
-    vehicle = _select_vehicle(candidates, target)
-    offer = _offer(vehicle, target)
+    vehicle, offer = _select_vehicle(candidates, target)
+    markup = DromPageMarkup()
+    if target is not None and collector.page_urls:
+        identities = [_identity({"url": url}, target) for url in collector.page_urls]
+        if not all(identity is True for identity in identities):
+            raise ListingImportError("parse_error", "канонический URL страницы относится к другому объявлению")
+        markup.feed(html)
+        markup.close()
     availability = str(offer.get("availability") or "").rsplit("/", 1)[-1].lower()
     if availability in _UNAVAILABLE:
         raise ListingImportError("listing_unavailable", "объявление снято с продажи")
@@ -293,25 +320,33 @@ def extract_listing_fields(html: str, *, target: ListingUrl | None = None) -> di
     is_ruble = isinstance(currency, str) and currency.strip().upper() in {"RUB", "RUR"}
     engine = _first(vehicle.get("vehicleEngine"))
     engine = engine if isinstance(engine, dict) else {}
-    images = _image_urls(
-        vehicle.get("image"), collector.og_images, target.canonical if target else None
+    page_url = target.canonical if target else None
+    images = _image_urls(markup.images, [], page_url) or _image_urls(
+        vehicle.get("image"), collector.og_images, page_url
     )
+    fuel, _, volume = (markup.value("engine") or "").partition(",")
+    mileage = vehicle.get("mileageFromOdometer")
+    displacement = engine.get("engineDisplacement")
+    power = engine.get("enginePower")
 
     return {
-        "listing_id": vehicle.get("sku") or vehicle.get("productID"),
+        "listing_id": (target.listing_id if target else None) or vehicle.get("sku") or vehicle.get("productID"),
         "brand": _name(vehicle.get("brand")) or _name(vehicle.get("manufacturer")),
         "model": _name(vehicle.get("model")),
         "year": vehicle.get("vehicleModelDate") or vehicle.get("productionDate")
-        or vehicle.get("modelDate"),
+        or vehicle.get("modelDate") or markup.value("year"),
         "price": offer.get("price") if is_ruble else None,
-        "mileage_km": _quantity(vehicle.get("mileageFromOdometer"), _MILEAGE_UNITS),
-        "trim": vehicle.get("vehicleConfiguration"),
-        "fuel_type": _name(engine.get("fuelType")) or _name(vehicle.get("fuelType")),
-        "engine_volume_l": _quantity(engine.get("engineDisplacement"), _VOLUME_UNITS),
-        "power_hp": _quantity(engine.get("enginePower"), _POWER_UNITS),
-        "transmission": _transmission(vehicle.get("vehicleTransmission")),
-        "drive_type": _drive(vehicle.get("driveWheelConfiguration")),
-        "city": _city(vehicle, offer),
+        "mileage_km": _quantity(
+            markup.value("mileage_km") if mileage is None else mileage, _MILEAGE_UNITS
+        ),
+        "trim": vehicle.get("vehicleConfiguration") or markup.value("trim"),
+        "fuel_type": _name(engine.get("fuelType")) or _name(vehicle.get("fuelType")) or fuel or None,
+        "engine_volume_l": _quantity(volume if displacement is None else displacement, _VOLUME_UNITS),
+        "power_hp": _quantity(markup.value("power_hp") if power is None else power, _POWER_UNITS),
+        "transmission": _transmission(vehicle.get("vehicleTransmission")) or markup.value("transmission"),
+        "drive_type": _drive(vehicle.get("driveWheelConfiguration")) or markup.value("drive_type"),
+        "city": _city(vehicle, offer) or markup.value("city"),
         "image_url": images[0] if images else None,
+        "image_urls": images,
         "market_valuation": None,
     }

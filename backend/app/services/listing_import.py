@@ -23,8 +23,10 @@ def make_parser_importer() -> ListingImporter:
     source = environ.get("DROM_LISTINGS_SOURCE", "demo").strip().lower() or "demo"
     if source != "demo":
         raise ValueError("DROM_LISTINGS_SOURCE: Core Backend поддерживает только demo")
-    parser = importer_from_env()
+    return adapt_parser(importer_from_env())
 
+
+def adapt_parser(parser: Callable[[str], Awaitable[ParserListingData]]) -> ListingImporter:
     async def import_listing(url: str) -> ListingData:
         try:
             data = await parser(url)

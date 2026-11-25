@@ -18,7 +18,7 @@ const engineVolume = z
 const uri = z.url({ error: 'Укажите полный адрес.' });
 
 const demoAuthority = /^https:\/\/auto\.drom\.ru(\/[^?#]*)(.*)$/i;
-const listingPath = /^(?:\/[A-Za-z0-9_.-]+)+\.html$/;
+const listingPath = /^(?:\/[A-Za-z0-9_.~-]+)+\.html$/;
 const uriParameter = "[A-Za-z0-9._~!$&'()*+,;=:@/?-]|%[0-9A-Fa-f]{2}";
 const urlSuffix = new RegExp(String.raw`^(?:\?(?:${uriParameter})*)?(?:#(?:${uriParameter})*)?$`);
 

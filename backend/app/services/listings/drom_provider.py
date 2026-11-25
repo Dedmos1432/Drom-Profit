@@ -84,14 +84,18 @@ class DromHtmlProvider:
             html = response.body.decode(response.charset, errors="replace")
         except LookupError:
             html = response.body.decode("utf-8", errors="replace")
-        raw = extract_listing_fields(html, target=response.url)
-        listing = normalize_listing(
-            raw,
-            source="drom",
-            listing_url=response.url.canonical,
-            listing_id=response.url.listing_id,
-            fetched_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        )
-        if listing.brand is None and listing.model is None and listing.price is None:
-            raise ListingImportError("parse_error", "не найдены марка, модель и цена")
-        return listing
+        return listing_from_html(html, response.url)
+
+
+def listing_from_html(html: str, target: ListingUrl) -> ListingData:
+    raw = extract_listing_fields(html, target=target)
+    listing = normalize_listing(
+        raw,
+        source="drom",
+        listing_url=target.canonical,
+        listing_id=target.listing_id,
+        fetched_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    )
+    if listing.price is None:
+        raise ListingImportError("parse_error", "не подтверждена цена в рублях")
+    return listing
