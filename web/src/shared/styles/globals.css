@@ -1,0 +1,65 @@
+@import './tokens.css';
+@import './typography.css';
+
+:root {
+  color-scheme: light;
+  --dp-interactive-motion: var(--dp-motion-feedback);
+  --dp-control-height: var(--dp-sizing-touch-target);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :root {
+    --dp-control-height: var(--dp-sizing-control);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dp-interactive-motion: var(--dp-motion-reduced);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-inline-size: 0;
+  background: var(--dp-color-semantic-background-page);
+  color: var(--dp-color-semantic-text-primary);
+}
+
+img,
+svg {
+  max-inline-size: 100%;
+  vertical-align: middle;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+::selection {
+  background: var(--dp-color-semantic-action-selected-surface);
+  color: var(--dp-color-semantic-action-selected-text);
+}
+
+:focus-visible {
+  outline: var(--dp-border-emphasis) solid var(--dp-color-semantic-action-focus);
+  outline-offset: var(--dp-border-focus-offset);
+}
+
+::placeholder {
+  color: var(--dp-color-semantic-text-placeholder);
+  opacity: 1;
+}

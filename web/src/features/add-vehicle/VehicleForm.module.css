@@ -1,0 +1,28 @@
+.group {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.group legend {
+  padding: 0;
+  margin-block-end: var(--dp-spacing-small);
+  font-size: var(--dp-typography-size-card-title);
+  font-weight: var(--dp-typography-weight-bold);
+}
+
+.fields {
+  display: grid;
+  gap: var(--dp-spacing-row);
+}
+
+.hint {
+  color: var(--dp-color-semantic-text-secondary);
+}
+
+@media (min-width: 600px) {
+  .fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -1,0 +1,63 @@
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dp-spacing-tiny);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  color: var(--dp-color-semantic-text-secondary);
+}
+
+.crumb {
+  display: inline-flex;
+  min-inline-size: 0;
+  align-items: center;
+  gap: var(--dp-spacing-tiny);
+}
+
+.crumb svg {
+  flex: none;
+  inline-size: var(--dp-icon-small);
+  block-size: var(--dp-icon-small);
+}
+
+.tabs {
+  min-inline-size: 0;
+}
+
+.tabList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dp-spacing-small);
+  border-block-end: var(--dp-border-thin) solid var(--dp-color-semantic-border-divider);
+}
+
+.tab {
+  min-block-size: var(--dp-control-height);
+  padding: var(--dp-spacing-tiny) var(--dp-spacing-small);
+  color: var(--dp-color-semantic-text-secondary);
+  background: none;
+  border: 0;
+  border-block-end: var(--dp-border-emphasis) solid transparent;
+  font-weight: var(--dp-typography-weight-semibold);
+}
+
+.tab:hover:not(:disabled) {
+  color: var(--dp-color-semantic-text-link);
+  background: var(--dp-color-semantic-background-hover);
+}
+
+.tab[aria-selected='true'] {
+  color: var(--dp-color-semantic-action-selected-text);
+  border-block-end-color: var(--dp-color-semantic-action-primary);
+}
+
+.tab:disabled {
+  color: var(--dp-color-semantic-text-disabled);
+  background: var(--dp-color-semantic-action-disabled);
+  cursor: not-allowed;
+}
+
+.tabPanel {
+  margin-block-start: var(--dp-spacing-small);
+}

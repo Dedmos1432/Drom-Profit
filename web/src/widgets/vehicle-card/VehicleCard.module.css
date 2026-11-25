@@ -1,0 +1,130 @@
+.card {
+  display: grid;
+  grid-template-columns: minmax(
+      0,
+      calc(var(--dp-sizing-compact-thumb) + var(--dp-spacing-panel))
+    ) minmax(0, 1fr);
+  grid-template-areas: 'photo description' 'money money' 'cta cta' 'actions actions';
+  align-items: start;
+  gap: var(--dp-spacing-small);
+  padding-block: var(--dp-spacing-row);
+  border-block-end: var(--dp-border-thin) solid var(--dp-color-semantic-border-divider);
+}
+
+.photo {
+  grid-area: photo;
+}
+
+.description {
+  grid-area: description;
+}
+
+.description,
+.money,
+.metrics {
+  display: grid;
+  gap: var(--dp-spacing-tiny);
+  min-inline-size: 0;
+  justify-items: start;
+}
+
+.description h3 {
+  overflow-wrap: anywhere;
+}
+
+.description h3,
+.description h3 a {
+  font-size: var(--dp-typography-size-section);
+  line-height: var(--dp-typography-line-height-section);
+}
+.description a {
+  text-decoration: none;
+}
+.description a:hover {
+  text-decoration: underline;
+}
+.money {
+  grid-area: money;
+  gap: var(--dp-spacing-small);
+}
+
+.cta {
+  grid-area: cta;
+  display: grid;
+  justify-items: start;
+  gap: var(--dp-spacing-tiny);
+}
+
+.issue {
+  display: grid;
+  justify-items: start;
+}
+
+.issue button {
+  padding-inline-start: 0;
+}
+.muted {
+  color: var(--dp-color-semantic-text-secondary);
+}
+
+.metric {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--dp-spacing-hairline) var(--dp-spacing-tiny);
+}
+
+.metrics {
+  justify-self: stretch;
+  justify-items: stretch;
+  margin: 0;
+}
+
+.calculated {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) fit-content(55%);
+  align-items: baseline;
+  gap: var(--dp-spacing-tiny);
+}
+
+.calculated dd {
+  margin: 0;
+  text-align: end;
+}
+
+.actions {
+  grid-area: actions;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: var(--dp-spacing-small);
+}
+
+@media (min-width: 600px) {
+  .card {
+    grid-template-columns: var(--dp-sizing-listing-thumb) minmax(0, 1fr) minmax(0, 36%);
+    grid-template-areas: 'photo description money' 'photo cta money' 'photo actions actions';
+    align-content: start;
+    gap: var(--dp-spacing-small) var(--dp-spacing-panel);
+  }
+}
+
+@media (min-width: 900px) {
+  .card {
+    grid-template-columns: clamp(
+        var(--dp-sizing-listing-photo-min),
+        18vw,
+        var(--dp-sizing-listing-photo-max)
+      ) minmax(0, 1fr) minmax(0, 30%) auto;
+    grid-template-areas: 'photo description money actions' 'photo cta money actions';
+    grid-template-rows: auto 1fr;
+    gap: var(--dp-spacing-row) var(--dp-spacing-roomy);
+    padding-block: var(--dp-spacing-panel);
+  }
+
+  .actions {
+    display: grid;
+    justify-items: start;
+  }
+}

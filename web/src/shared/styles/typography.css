@@ -1,0 +1,43 @@
+body {
+  font-family: var(--dp-typography-family-ui);
+  font-size: var(--dp-typography-size-body);
+  line-height: var(--dp-typography-line-height-body);
+  overflow-wrap: anywhere;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: var(--dp-title-size);
+  line-height: var(--dp-title-height);
+}
+
+h2 {
+  font-size: var(--dp-typography-size-section);
+  line-height: var(--dp-typography-line-height-section);
+}
+
+h3 {
+  font-size: var(--dp-typography-size-card-title);
+  line-height: var(--dp-typography-line-height-card-title);
+}
+
+h1,
+h2,
+h3 {
+  font-weight: var(--dp-typography-weight-bold);
+}
+
+a {
+  color: var(--dp-color-semantic-text-link);
+  text-underline-offset: 0.16em;
+}
+
+a:hover {
+  color: var(--dp-color-semantic-text-link-hover);
+}

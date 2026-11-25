@@ -1,0 +1,119 @@
+.button {
+  --button-height: var(--dp-control-height);
+  --button-background: transparent;
+  --button-foreground: var(--dp-color-semantic-text-primary);
+  --button-border: transparent;
+  --button-hover: var(--dp-color-semantic-background-hover);
+  --button-active: var(--dp-color-semantic-background-pressed);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dp-component-button-icon-gap);
+  max-inline-size: 100%;
+  min-block-size: var(--button-height);
+  padding: var(--dp-spacing-tiny) var(--dp-component-button-padding-inline);
+  border: var(--dp-border-thin) solid var(--button-border);
+  border-radius: var(--dp-component-button-radius);
+  background: var(--button-background);
+  color: var(--button-foreground);
+  font-size: var(--dp-typography-size-compact);
+  font-weight: var(--dp-typography-weight-semibold);
+  line-height: var(--dp-typography-line-height-compact);
+  text-align: center;
+  transition: background-color var(--dp-interactive-motion) var(--dp-motion-easing);
+}
+
+.standard {
+  --button-height: var(--dp-control-height);
+}
+.large {
+  --button-height: var(--dp-component-button-height-large);
+}
+.full {
+  inline-size: 100%;
+}
+
+.primary {
+  --button-foreground: var(--dp-color-semantic-text-inverse);
+  --button-background: var(--dp-color-semantic-action-primary);
+  --button-hover: var(--dp-color-semantic-action-primary-hover);
+  --button-active: var(--dp-color-semantic-action-primary-pressed);
+}
+
+.secondary {
+  --button-foreground: var(--dp-color-semantic-action-secondary-text);
+  --button-background: var(--dp-color-semantic-action-secondary);
+  --button-hover: var(--dp-color-semantic-action-secondary-hover);
+  --button-active: var(--dp-color-semantic-action-secondary-pressed);
+}
+
+.contrast {
+  --button-foreground: var(--dp-color-semantic-text-inverse);
+  --button-background: var(--dp-color-semantic-action-contrast);
+  --button-hover: var(--dp-color-semantic-action-contrast-hover);
+  --button-active: var(--dp-color-semantic-action-contrast);
+}
+
+.outline {
+  --button-foreground: var(--dp-color-semantic-action-outline);
+  --button-border: var(--dp-color-semantic-action-outline);
+  --button-hover: var(--dp-color-semantic-action-secondary);
+  --button-active: var(--dp-color-semantic-action-secondary-hover);
+}
+
+.ghost {
+  --button-foreground: var(--dp-color-semantic-text-link);
+}
+
+.danger {
+  --button-foreground: var(--dp-color-semantic-text-inverse);
+  --button-background: var(--dp-color-semantic-action-danger);
+  --button-hover: var(--dp-color-semantic-action-danger-hover);
+  --button-active: var(--dp-color-semantic-action-danger-pressed);
+}
+
+@media (hover: hover) {
+  .button:hover:not(:disabled) {
+    background: var(--button-hover);
+  }
+}
+
+.button:active:not(:disabled) {
+  background: var(--button-active);
+}
+
+.button:disabled {
+  background: var(--dp-color-semantic-action-disabled);
+  color: var(--dp-color-semantic-text-disabled);
+  border-color: transparent;
+  cursor: not-allowed;
+}
+
+.iconButton {
+  min-inline-size: var(--button-height);
+  padding-inline: var(--dp-spacing-tiny);
+}
+
+.icon {
+  display: inline-flex;
+  inline-size: var(--dp-icon-default);
+  block-size: var(--dp-icon-default);
+  flex: none;
+}
+
+.icon svg {
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .loading {
+    animation: rotate var(--dp-motion-spinner) linear infinite;
+  }
+}
+
+@keyframes rotate {
+  to {
+    transform: rotate(1turn);
+  }
+}

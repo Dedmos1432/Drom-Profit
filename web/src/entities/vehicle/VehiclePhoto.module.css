@@ -1,0 +1,7 @@
+.photo {
+  display: grid;
+  inline-size: 100%;
+  aspect-ratio: var(--dp-sizing-thumbnail-aspect);
+  object-fit: cover;
+  border-radius: var(--dp-radius-image);
+}
