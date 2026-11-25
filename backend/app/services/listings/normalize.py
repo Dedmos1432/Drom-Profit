@@ -13,6 +13,7 @@ import re
 from collections.abc import Mapping
 from datetime import date
 from typing import Any
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from .models import ListingData, ListingSource
 
@@ -196,18 +197,31 @@ def split_engine(value: Any) -> tuple[str | None, float | None]:
     return fuel, volume
 
 
-def https_url(value: Any) -> str | None:
-    """Только абсолютный https URL без пробелов и учетных данных; иначе ``None``.
-
-    Адрес фотографии не загружается сервером — он лишь передается клиенту.
-    """
-    text = value.strip() if isinstance(value, str) else None
-    if not text or len(text) > 2048 or not text.isascii() or not text.startswith("https://"):
+def https_url(value: Any, *, page_url: str | None = None) -> str | None:
+    """Проверяет ссылку для передачи клиенту. Относительные адреса остаются на хосте страницы."""
+    text = value.strip() if isinstance(value, str) else ""
+    if (
+        not text or len(text) > 2048 or not text.isascii() or "\\" in text
+        or any(ch.isspace() or not 0x21 <= ord(ch) < 0x7F for ch in text)
+    ):
         return None
-    authority = text[len("https://"):].split("/", 1)[0]
-    if not authority or "@" in authority or any(ch.isspace() or ord(ch) < 0x21 for ch in text):
+    try:
+        parts = urlsplit(text)
+        if not parts.scheme:
+            if not page_url or not parts.path:
+                return None
+            page_host = urlsplit(page_url).hostname
+            parts = urlsplit(urljoin(page_url, text))
+            if parts.hostname != page_host:
+                return None
+        if (
+            parts.scheme != "https" or not parts.hostname or parts.netloc.lower() != parts.hostname
+            or not re.fullmatch(r"[a-z0-9-]+(?:\.[a-z0-9-]+)+", parts.hostname)
+        ):
+            return None
+        return urlunsplit(parts._replace(netloc=parts.hostname, fragment=""))
+    except ValueError:
         return None
-    return text
 
 
 def normalize_listing(
@@ -229,7 +243,7 @@ def normalize_listing(
     raw_id = raw.get("listing_id")
     return ListingData(
         source=source,
-        listing_id=clean_text(str(raw_id) if isinstance(raw_id, int) else raw_id) or listing_id,
+        listing_id=clean_text(str(raw_id) if type(raw_id) is int else raw_id) or listing_id,
         brand=clean_text(raw.get("brand"), 80),
         model=clean_text(raw.get("model"), 80),
         year=parse_year(raw.get("year")),

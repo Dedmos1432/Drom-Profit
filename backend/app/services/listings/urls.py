@@ -16,7 +16,7 @@ from .errors import ListingImportError
 MAX_URL_LENGTH = 2048
 _LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
 _PATH = re.compile(r"(?:/[A-Za-z0-9_.-]+)+\.html")
-_LISTING_ID = re.compile(r"/(\d{4,12})\.html")
+_LISTING_ID = re.compile(r"/(\d{4,12})\.html$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,6 +25,11 @@ class ListingUrl:
     host: str
     path: str
     listing_id: str | None  # числовой ID из пути, если он есть
+
+    def matches_listing(self, other: "ListingUrl") -> bool:
+        if self.listing_id is not None:
+            return self.listing_id == other.listing_id
+        return self.canonical == other.canonical
 
 
 class HostAllowlist:
@@ -58,9 +63,12 @@ class HostAllowlist:
         label, _, rest = host.partition(".")
         return rest in self._suffixes and _LABEL.fullmatch(label) is not None
 
+    @property
+    def entries(self) -> tuple[str, ...]:
+        return (*sorted(self._exact), *sorted(f"*.{suffix}" for suffix in self._suffixes))
+
     def __repr__(self) -> str:
-        items = sorted(self._exact) + sorted(f"*.{suffix}" for suffix in self._suffixes)
-        return f"HostAllowlist({items!r})"
+        return f"HostAllowlist({list(self.entries)!r})"
 
 
 def _check_hostname(host: str) -> None:
@@ -97,7 +105,7 @@ def validate_listing_url(url: object, allowed_hosts: HostAllowlist) -> ListingUr
     if not _PATH.fullmatch(path) or "/../" in path + "/" or "/./" in path + "/":
         raise ListingImportError("invalid_url", "путь не похож на страницу объявления")
     match = _LISTING_ID.search(path)
-    listing_id = match.group(1) if match and path.endswith(match.group(0)) else None
+    listing_id = match.group(1) if match else None
     return ListingUrl(
         canonical=f"https://{host}{path}", host=host, path=path, listing_id=listing_id
     )

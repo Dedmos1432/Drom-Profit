@@ -162,3 +162,50 @@ def test_invalid_url_never_reaches_network():
 )
 def test_is_public_address(address, public):
     assert is_public_address(address) is public
+
+
+@pytest.mark.parametrize(("status", "code"), [
+    (404, "listing_unavailable"), (410, "listing_unavailable"), (403, "source_forbidden"),
+    (429, "source_forbidden"), (503, "source_unavailable"), (400, "parse_error"),
+])
+def test_error_status_does_not_consume_body_and_closes_response(status, code):
+    closed = []
+
+    def delayed_body():
+        pytest.fail("error response body was read")
+        yield b"unused"
+
+    def transport(*args):
+        return RawResponse(status, HTML | {"content-length": "9000000"}, delayed_body(),
+                           close=lambda: closed.append(True))
+
+    assert code_of(lambda: client(transport).get_html(URL)) == code
+    assert closed == [True]
+
+
+@pytest.mark.parametrize(("redirect_hosts", "location", "expected_code"), [
+    ((), "https://moscow.drom.ru/toyota/camry/12345678.html", "source_unavailable"),
+    (("moscow.drom.ru",), "https://moscow.drom.ru/toyota/camry/12345678.html", None),
+    ((), "/toyota/camry/12345678.html?from=redirect", None),
+    ((), "/toyota/camry/87654321.html", "parse_error"),
+])
+def test_configured_redirects_enforce_host_and_listing_identity(redirect_hosts, location, expected_code):
+    transport = FakeTransport((302, {"location": location}, []), (200, HTML, [b"ok"]))
+    http = SafeHttpClient(
+        HostAllowlist(("vladivostok.drom.ru",)), resolver=lambda host: [PUBLIC_IP],
+        transport=transport, redirect_hosts=redirect_hosts,
+    )
+    if expected_code:
+        assert code_of(lambda: http.get_html(URL)) == expected_code
+        assert len(transport.calls) == 1
+    else:
+        assert http.get_html(URL).body == b"ok"
+        assert len(transport.calls) == 2
+
+
+def test_redirect_from_url_without_id_cannot_choose_another_vehicle():
+    transport = FakeTransport((302, {"location": "/toyota/camry/12345678.html"}, []))
+    http = client(transport)
+    requested = "https://vladivostok.drom.ru/toyota/camry/alias.html"
+    assert code_of(lambda: http.get_html(requested)) == "parse_error"
+    assert len(transport.calls) == 1

@@ -97,8 +97,11 @@ class _PinnedHTTPSConnection(http.client.HTTPSConnection):
         sock = socket.create_connection((self._address, 443), self.timeout)
         try:
             peer = sock.getpeername()[0]
-            if not is_public_address(peer):
-                raise ListingImportError("source_unavailable", "пир не является публичным адресом")
+            if (
+                not is_public_address(peer)
+                or ipaddress.ip_address(peer) != ipaddress.ip_address(self._address)
+            ):
+                raise ListingImportError("source_unavailable", "адрес пира не совпадает с проверенным IP")
             self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
         except BaseException:
             sock.close()
@@ -125,11 +128,17 @@ def socket_transport(
         while chunk := response.read(64 * 1024):
             yield chunk
 
+    def close() -> None:
+        try:
+            response.close()
+        finally:
+            connection.close()
+
     return RawResponse(
         status=response.status,
         headers={key.lower(): value for key, value in response.getheaders()},
         chunks=chunks(),
-        close=connection.close,
+        close=close,
     )
 
 
@@ -143,8 +152,10 @@ class SafeHttpClient:
         transport: Transport = socket_transport,
         user_agent: str = USER_AGENT,
         clock: Callable[[], float] = time.monotonic,
+        redirect_hosts: tuple[str, ...] | None = None,
     ):
         self.allowed_hosts = allowed_hosts
+        self._redirect_hosts = redirect_hosts
         self.limits = limits
         self._resolver = resolver
         self._transport = transport
@@ -153,12 +164,15 @@ class SafeHttpClient:
 
     def get_html(self, url: str) -> HttpResponse:
         """Загружает HTML-страницу объявления или бросает ``ListingImportError``."""
-        target = validate_listing_url(url, self.allowed_hosts)
+        requested = validate_listing_url(url, self.allowed_hosts)
+        target = requested
         deadline = self._clock() + self.limits.total_timeout
         for _hop in range(self.limits.max_redirects + 1):
             status, headers, body = self._request(target, deadline)
             if status in _REDIRECTS:
                 target = self._redirect_target(target, headers.get("location"))
+                if not requested.matches_listing(target):
+                    raise ListingImportError("parse_error", "перенаправление сменило объявление")
                 continue
             if status in _GONE:
                 raise ListingImportError("listing_unavailable", f"HTTP {status}")
@@ -168,11 +182,6 @@ class SafeHttpClient:
                 raise ListingImportError("source_unavailable", f"HTTP {status}")
             if status != 200:
                 raise ListingImportError("parse_error", f"неожиданный HTTP {status}")
-            media_type = headers.get("content-type", "").split(";")[0].strip().lower()
-            if media_type not in _HTML_TYPES:
-                raise ListingImportError("parse_error", f"неожиданный тип {media_type or '-'}")
-            if headers.get("content-encoding", "identity").lower() not in ("", "identity"):
-                raise ListingImportError("parse_error", "неожиданное сжатие ответа")
             return HttpResponse(url=target, status=status, headers=headers, body=body)
         raise ListingImportError("source_unavailable", "слишком много перенаправлений")
 
@@ -181,13 +190,16 @@ class SafeHttpClient:
             raise ListingImportError("parse_error", "перенаправление без Location")
         if location.startswith("/") and not location.startswith("//"):
             location = f"https://{current.host}{location}"
+        allowed = self.allowed_hosts if self._redirect_hosts is None else HostAllowlist(
+            (current.host, *self._redirect_hosts)
+        )
         try:
-            return validate_listing_url(location, self.allowed_hosts)
+            return validate_listing_url(location, allowed)
         except ListingImportError:
             # Удаленные объявления обычно уводят на поиск того же сайта.
             try:
                 same_site = location.startswith("https://") and (
-                    location[len("https://"):].split("/", 1)[0].lower() in self.allowed_hosts
+                    location[len("https://"):].split("/", 1)[0].lower() in allowed
                 )
             except Exception:
                 same_site = False
@@ -215,8 +227,13 @@ class SafeHttpClient:
         except (OSError, http.client.HTTPException) as error:
             raise ListingImportError("source_unavailable", type(error).__name__) from None
         try:
-            if raw.status in _REDIRECTS:
+            if raw.status != 200:
                 return raw.status, raw.headers, b""
+            media_type = raw.headers.get("content-type", "").split(";")[0].strip().lower()
+            if media_type not in _HTML_TYPES:
+                raise ListingImportError("parse_error", "ответ источника не HTML")
+            if raw.headers.get("content-encoding", "identity").lower() not in ("", "identity"):
+                raise ListingImportError("parse_error", "неожиданное сжатие ответа")
             return raw.status, raw.headers, self._read_body(raw, deadline)
         finally:
             raw.close()
@@ -235,8 +252,14 @@ class SafeHttpClient:
     def _read_body(self, raw: RawResponse, deadline: float) -> bytes:
         limit = self.limits.max_bytes
         declared = raw.headers.get("content-length")
-        if declared is not None and (not declared.strip().isdigit() or int(declared) > limit):
-            raise ListingImportError("parse_error", "ответ превышает допустимый размер")
+        if declared is not None:
+            length = declared.strip()
+            if (
+                not length.isascii() or not length.isdecimal()
+                or len(length.lstrip("0")) > len(str(limit))
+                or int(length.lstrip("0") or "0") > limit
+            ):
+                raise ListingImportError("parse_error", "ответ превышает допустимый размер")
         body = bytearray()
         try:
             for chunk in _guarded(raw.chunks):

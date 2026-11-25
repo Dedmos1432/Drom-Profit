@@ -83,3 +83,32 @@ def test_unexpected_provider_errors_become_parse_error():
     from app.services.listings import ListingImporter
 
     assert error_code(ListingImporter(Broken()), "https://auto.drom.ru/demo/1.html") == "parse_error"
+
+
+def test_all_demo_fixtures_keep_the_complete_public_contract():
+    expected = json.loads(DEFAULT_FIXTURE_PATH.read_text("utf-8"))
+    importer = importer_from_env({})
+    actual = [run(importer(row["listing_url"])).as_dict() for row in expected]
+    assert len(actual) == 3
+    assert actual == expected
+    assert all(len(row) == 18 for row in actual)
+
+
+@pytest.mark.parametrize("hosts", ["", "*.drom.ru", "drom.ru", "sub.city.drom.ru", "other.example"])
+def test_approved_flag_still_requires_exact_drom_hosts(hosts):
+    with pytest.raises((RuntimeError, ValueError)):
+        importer_from_env({
+            "DROM_LISTINGS_SOURCE": "drom", "DROM_LISTINGS_ACCESS_APPROVED": "yes",
+            "DROM_LISTINGS_HOSTS": hosts,
+        })
+
+
+def test_real_provider_can_be_configured_with_exact_hosts_without_opening_network():
+    importer = importer_from_env({
+        "DROM_LISTINGS_SOURCE": "drom", "DROM_LISTINGS_ACCESS_APPROVED": "yes",
+        "DROM_LISTINGS_HOSTS": "vladivostok.drom.ru, auto.drom.ru",
+        "DROM_LISTINGS_REDIRECT_HOSTS": "moscow.drom.ru",
+    })
+    assert importer.source == "drom"
+    assert importer.provider.allowed_hosts.entries == ("auto.drom.ru", "vladivostok.drom.ru")
+    assert error_code(importer, "https://moscow.drom.ru/toyota/camry/12345678.html") == "invalid_url"

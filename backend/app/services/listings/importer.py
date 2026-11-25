@@ -13,6 +13,7 @@ from typing import Literal, Protocol
 from .errors import ListingImportError
 from .fixture_provider import FixtureListingProvider
 from .models import ListingData
+from .urls import HostAllowlist
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ class ListingImporter:
         except ListingImportError as error:
             logger.info("listing import failed: %s (%s)", error.code, error.detail)
             raise
-        except (ValueError, TypeError, KeyError, UnicodeError) as error:
+        except (ValueError, TypeError, KeyError, OverflowError, RecursionError) as error:
             logger.warning("listing import parse failure: %s", type(error).__name__)
             raise ListingImportError("parse_error", type(error).__name__) from error
         if listing.source != self.provider.source:
@@ -56,13 +57,19 @@ def make_importer(
     *,
     fixture_path: Path | None = None,
     drom_access_approved: bool = False,
+    drom_hosts: HostAllowlist | None = None,
+    drom_redirect_hosts: HostAllowlist | None = None,
 ) -> ListingImporter:
     if source == "demo":
         return ListingImporter(FixtureListingProvider.from_file(fixture_path or DEFAULT_FIXTURE_PATH))
     if source == "drom":
         from .drom_provider import DromHtmlProvider
 
-        return ListingImporter(DromHtmlProvider(access_approved=drom_access_approved))
+        return ListingImporter(DromHtmlProvider(
+            access_approved=drom_access_approved,
+            allowed_hosts=drom_hosts,
+            redirect_hosts=drom_redirect_hosts,
+        ))
     raise ValueError(f"Неизвестный источник объявлений: {source!r}")
 
 
@@ -71,17 +78,24 @@ def importer_from_env(environ: Mapping[str, str] = os.environ) -> ListingImporte
 
     * ``DROM_LISTINGS_SOURCE`` — ``demo`` (по умолчанию) или ``drom``;
     * ``DROM_LISTINGS_FIXTURE`` — путь к JSON для demo;
-    * ``DROM_LISTINGS_ACCESS_APPROVED=yes`` — обязателен для ``drom``.
+    * ``DROM_LISTINGS_ACCESS_APPROVED=yes`` — обязателен для ``drom``;
+    * ``DROM_LISTINGS_HOSTS`` и ``DROM_LISTINGS_REDIRECT_HOSTS`` — точные хосты через запятую.
     """
     source = environ.get("DROM_LISTINGS_SOURCE", "demo").strip().lower() or "demo"
     fixture = environ.get("DROM_LISTINGS_FIXTURE")
     approved = environ.get("DROM_LISTINGS_ACCESS_APPROVED", "").strip().lower() == "yes"
     if source not in ("demo", "drom"):
         raise ValueError(f"DROM_LISTINGS_SOURCE: ожидается demo или drom, получено {source!r}")
+    if source == "demo":
+        return make_importer(source, fixture_path=Path(fixture) if fixture else None)
+
+    hosts = environ.get("DROM_LISTINGS_HOSTS", "").strip()
+    redirects = environ.get("DROM_LISTINGS_REDIRECT_HOSTS", "").strip()
     return make_importer(
-        source,  # type: ignore[arg-type]
-        fixture_path=Path(fixture) if fixture else None,
+        source,
         drom_access_approved=approved,
+        drom_hosts=HostAllowlist(hosts.split(",")) if hosts else None,
+        drom_redirect_hosts=HostAllowlist(redirects.split(",")) if redirects else None,
     )
 
 

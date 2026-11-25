@@ -9,10 +9,14 @@
 """
 
 import json
+from collections import deque
 from html.parser import HTMLParser
 from typing import Any
+from urllib.parse import urljoin, urlsplit
 
 from .errors import ListingImportError
+from .normalize import https_url
+from .urls import HostAllowlist, ListingUrl, validate_listing_url
 
 _VEHICLE_TYPES = {"car", "vehicle", "motorizedbicycle", "product", "individualproduct"}
 _UNAVAILABLE = ("soldout", "discontinued", "outofstock")
@@ -34,7 +38,7 @@ class _Collector(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.json_ld: list[str] = []
-        self.meta: dict[str, str] = {}
+        self.og_images: list[str] = []
         self._in_json_ld = False
         self._buffer: list[str] = []
 
@@ -44,8 +48,8 @@ class _Collector(HTMLParser):
             self._in_json_ld, self._buffer = True, []
         elif tag == "meta":
             key = (values.get("property") or values.get("name") or "").lower()
-            if key and key not in self.meta and "content" in values:
-                self.meta[key] = values["content"]
+            if key == "og:image" and "content" in values:
+                self.og_images.append(values["content"])
 
     def handle_endtag(self, tag: str) -> None:
         if tag == "script" and self._in_json_ld:
@@ -88,28 +92,128 @@ def _name(value: Any) -> Any:
     return value.get("name") if isinstance(value, dict) else value
 
 
-def _quantity(value: Any) -> tuple[Any, str]:
-    """QuantitativeValue → (значение, unitCode/unitText в нижнем регистре)."""
+_MILEAGE_UNITS = {
+    "kmt": "км", "km": "км", "км": "км", "километр": "км", "километры": "км",
+    "тыс. км": "тыс. км", "тыс км": "тыс. км",
+}
+_VOLUME_UNITS = {
+    "ltr": "л", "l": "л", "л": "л", "литр": "л", "литры": "л",
+    "cmq": "см3", "cm3": "см3", "cm³": "см3", "см3": "см3", "см³": "см3", "cc": "см3",
+}
+_POWER_UNITS = {
+    "bhp": "л.с.", "hp": "л.с.", "л.с.": "л.с.", "л. с.": "л.с.",
+    "kwt": "кВт", "kw": "кВт", "квт": "кВт",
+}
+
+
+def _quantity(value: Any, units: dict[str, str]) -> str | None:
     value = _first(value)
     if isinstance(value, dict):
-        unit = value.get("unitCode") or value.get("unitText") or ""
-        return value.get("value"), str(unit).lower()
-    return value, ""
+        declared = [value[key] for key in ("unitCode", "unitText") if value.get(key) is not None]
+        amount = value.get("value")
+        if declared:
+            suffixes = {
+                units.get(unit.strip().lower()) if isinstance(unit, str) else None
+                for unit in declared
+            }
+            if None in suffixes or len(suffixes) != 1 or type(amount) not in (str, int, float):
+                return None
+            return f"{amount} {suffixes.pop()}"
+        value = amount
+    # Без единицы годится только текст с собственным обозначением, которое проверит нормализатор.
+    if isinstance(value, str) and any(ch.isalpha() for ch in value):
+        return value
+    return None
 
 
-def _with_unit(value: Any, unit: str, units: dict[str, str]) -> Any:
-    """Добавляет к числу единицу из unitCode, чтобы нормализатор понял масштаб."""
-    suffix = units.get(unit)
-    if suffix and isinstance(value, (int, float, str)) and not isinstance(value, bool):
-        return f"{value} {suffix}"
-    return value
+def _identity(item: dict[str, Any], target: ListingUrl) -> bool | None:
+    """True — совпадение, False — явное расхождение, None — данных для сверки нет."""
+    matches: list[bool] = []
+    for key in ("sku", "productID"):
+        value = item.get(key)
+        if target.listing_id and type(value) in (str, int):
+            identifier = str(value).strip()
+            if identifier.isascii() and identifier.isdecimal():
+                matches.append(identifier == target.listing_id)
+    for key in ("url", "@id", "mainEntityOfPage"):
+        value = _first(item.get(key))
+        if isinstance(value, dict):
+            value = value.get("url") or value.get("@id")
+        if not isinstance(value, str) or not value or value.startswith("#"):
+            continue
+        try:
+            parts = urlsplit(value)
+            if parts.scheme and parts.scheme not in ("http", "https"):
+                continue
+            if not parts.path and not parts.netloc:
+                continue
+            linked = validate_listing_url(
+                urljoin(target.canonical, value), HostAllowlist((target.host,))
+            )
+            matches.append(linked.canonical == target.canonical)
+        except (ValueError, ListingImportError):
+            matches.append(False)
+    return all(matches) if matches else None
 
 
-def _offer(item: dict[str, Any]) -> dict[str, Any]:
-    offers = _first(item.get("offers"))
-    if isinstance(offers, dict) and "aggregateoffer" in _types(offers):
-        offers = _first(offers.get("offers")) or offers
-    return offers if isinstance(offers, dict) else {}
+def _select_vehicle(candidates: list[dict[str, Any]], target: ListingUrl | None) -> dict[str, Any]:
+    if target is not None:
+        candidates = [item for item in candidates if _identity(item, target) is True]
+    if len(candidates) != 1:
+        raise ListingImportError("parse_error", "автомобиль не удалось однозначно связать с объявлением")
+    return candidates[0]
+
+
+def _offer(item: dict[str, Any], target: ListingUrl | None) -> dict[str, Any]:
+    values = item.get("offers")
+    pending = deque(values if isinstance(values, list) else [values])
+    offers: list[dict[str, Any]] = []
+    examined = 0
+    while pending:
+        examined += 1
+        if examined > 200:
+            raise ListingImportError("parse_error", "в объявлении слишком много предложений")
+        entry = pending.popleft()
+        if not isinstance(entry, dict):
+            continue
+        if "aggregateoffer" in _types(entry) and entry.get("offers"):
+            children = entry["offers"]
+            pending.extendleft(reversed(children if isinstance(children, list) else [children]))
+        else:
+            offers.append(entry)
+    if not offers:
+        return {}
+
+    if target is not None:
+        identities: list[bool | None] = []
+        for offer in offers:
+            offered = offer.get("itemOffered")
+            signals = [_identity(offer, target)]
+            if isinstance(offered, dict):
+                signals.append(_identity(offered, target))
+            identities.append(False if False in signals else True if True in signals else None)
+        matched = [offer for offer, identity in zip(offers, identities) if identity is True]
+        if matched:
+            offers = matched
+        elif len(offers) != 1 or identities[0] is False:
+            raise ListingImportError("parse_error", "предложение не удалось связать с объявлением")
+    if len(offers) != 1:
+        raise ListingImportError("parse_error", "в объявлении несколько подходящих предложений")
+    return offers[0]
+
+
+def _image_urls(images: Any, og_images: list[str], page_url: str | None) -> tuple[str, ...]:
+    """Валидные снимки в исходном порядке, с og:image как запасным источником."""
+    candidates: list[Any] = []
+    for image in images if isinstance(images, list) else [images]:
+        if isinstance(image, dict):
+            candidates.extend((image.get("url"), image.get("contentUrl")))
+        else:
+            candidates.append(image)
+    valid = dict.fromkeys(url for item in candidates if (url := https_url(item, page_url=page_url)))
+    if not valid:
+        valid = dict.fromkeys(url for item in og_images if (url := https_url(item, page_url=page_url)))
+    return tuple(valid)
 
 
 def _city(item: dict[str, Any], offer: dict[str, Any]) -> Any:
@@ -150,7 +254,7 @@ def looks_blocked(html: str) -> bool:
     return any(marker in sample for marker in _BLOCK_MARKERS)
 
 
-def extract_listing_fields(html: str) -> dict[str, Any]:
+def extract_listing_fields(html: str, *, target: ListingUrl | None = None) -> dict[str, Any]:
     """Возвращает «сырые» поля для ``normalize_listing``.
 
     Ошибки: ``source_forbidden`` для страниц CAPTCHA/блокировки,
@@ -164,43 +268,34 @@ def extract_listing_fields(html: str) -> dict[str, Any]:
     except Exception:
         raise ListingImportError("parse_error", "HTML не разбирается") from None
 
-    vehicle = None
+    candidates: list[dict[str, Any]] = []
     for block in collector.json_ld:
         if len(block) > MAX_JSON_LD_LENGTH:
             continue
         try:
             data = json.loads(block)
-        except ValueError:
+        except (ValueError, RecursionError):
             continue
-        for item in _walk(data):
-            if _types(item) & _VEHICLE_TYPES:
-                vehicle = item
-                if _types(item) & {"car", "vehicle"}:
-                    break
-        if vehicle is not None and _types(vehicle) & {"car", "vehicle"}:
-            break
+        candidates.extend(item for item in _walk(data) if _types(item) & _VEHICLE_TYPES)
 
-    if vehicle is None:
+    if not candidates:
         if looks_blocked(html):
             raise ListingImportError("source_forbidden", "страница проверки или блокировки")
         raise ListingImportError("parse_error", "нет структурированных данных автомобиля")
 
-    offer = _offer(vehicle)
+    vehicle = _select_vehicle(candidates, target)
+    offer = _offer(vehicle, target)
     availability = str(offer.get("availability") or "").rsplit("/", 1)[-1].lower()
     if availability in _UNAVAILABLE:
         raise ListingImportError("listing_unavailable", "объявление снято с продажи")
 
-    currency = str(offer.get("priceCurrency") or "RUB").upper()
+    currency = offer.get("priceCurrency")
+    is_ruble = isinstance(currency, str) and currency.strip().upper() in {"RUB", "RUR"}
     engine = _first(vehicle.get("vehicleEngine"))
     engine = engine if isinstance(engine, dict) else {}
-    volume, volume_unit = _quantity(engine.get("engineDisplacement"))
-    power, power_unit = _quantity(engine.get("enginePower"))
-    mileage, mileage_unit = _quantity(vehicle.get("mileageFromOdometer"))
-    if mileage_unit in ("smi", "mile", "miles"):
-        mileage = None  # пересчет миль не делаем: источник должен указывать км
-    image = _first(vehicle.get("image"))
-    if isinstance(image, dict):
-        image = image.get("url") or image.get("contentUrl")
+    images = _image_urls(
+        vehicle.get("image"), collector.og_images, target.canonical if target else None
+    )
 
     return {
         "listing_id": vehicle.get("sku") or vehicle.get("productID"),
@@ -208,15 +303,15 @@ def extract_listing_fields(html: str) -> dict[str, Any]:
         "model": _name(vehicle.get("model")),
         "year": vehicle.get("vehicleModelDate") or vehicle.get("productionDate")
         or vehicle.get("modelDate"),
-        "price": offer.get("price") if currency in ("RUB", "RUR") else None,
-        "mileage_km": mileage,
+        "price": offer.get("price") if is_ruble else None,
+        "mileage_km": _quantity(vehicle.get("mileageFromOdometer"), _MILEAGE_UNITS),
         "trim": vehicle.get("vehicleConfiguration"),
         "fuel_type": _name(engine.get("fuelType")) or _name(vehicle.get("fuelType")),
-        "engine_volume_l": _with_unit(volume, volume_unit, {"ltr": "л", "cmq": "см3", "l": "л"}),
-        "power_hp": _with_unit(power, power_unit, {"bhp": "л.с.", "hp": "л.с.", "kwt": "кВт"}),
+        "engine_volume_l": _quantity(engine.get("engineDisplacement"), _VOLUME_UNITS),
+        "power_hp": _quantity(engine.get("enginePower"), _POWER_UNITS),
         "transmission": _transmission(vehicle.get("vehicleTransmission")),
         "drive_type": _drive(vehicle.get("driveWheelConfiguration")),
         "city": _city(vehicle, offer),
-        "image_url": image or collector.meta.get("og:image"),
+        "image_url": images[0] if images else None,
         "market_valuation": None,
     }
