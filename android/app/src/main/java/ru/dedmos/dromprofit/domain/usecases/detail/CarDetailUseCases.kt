@@ -23,18 +23,18 @@ class CarDetailUseCases(private val repository: CarRepository) {
     suspend fun reviewBenefits(carId: String, reviewed: Boolean): Car =
         repository.updateReviewed(carId, benefitsReviewed = reviewed)
 
-    suspend fun saveExpense(carId: String, input: ExpenseInput, expenseId: String?): Expense =
-        repository.saveExpense(carId, input, expenseId)
+    suspend fun saveExpense(carId: String, input: ExpenseInput, original: Expense?): Expense =
+        repository.saveExpense(carId, input, original)
 
     suspend fun deleteExpense(carId: String, expenseId: String) = repository.deleteExpense(carId, expenseId)
 
-    suspend fun saveBenefit(carId: String, input: BenefitInput, benefitId: String?): Benefit =
-        repository.saveBenefit(carId, input, benefitId)
+    suspend fun saveBenefit(carId: String, input: BenefitInput, original: Benefit?): Benefit =
+        repository.saveBenefit(carId, input, original)
 
     suspend fun deleteBenefit(carId: String, benefitId: String) = repository.deleteBenefit(carId, benefitId)
 
-    suspend fun saveNote(carId: String, input: NoteInput, noteId: String?): Note =
-        repository.saveNote(carId, input, noteId)
+    suspend fun saveNote(carId: String, input: NoteInput, original: Note?): Note =
+        repository.saveNote(carId, input, original)
 
     suspend fun deleteNote(carId: String, noteId: String) = repository.deleteNote(carId, noteId)
 }

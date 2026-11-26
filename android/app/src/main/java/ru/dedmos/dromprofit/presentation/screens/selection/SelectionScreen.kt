@@ -399,8 +399,8 @@ private fun SelectionPreview() {
         enginePower = 181, driveType = "Передний", city = "Владивосток", source = CarSource.DEMO,
     )
     val summary = Summary(
-        car.id, car.price, 33_000.toBigInteger(), 25_000.toBigInteger(), 1_233_000.toBigInteger(),
-        1_208_000.toBigInteger(), AssessmentStatus.COMPLETE, 0, 0,
+        car.id, car.price, 33_000L, 25_000L, 1_233_000L,
+        1_208_000L, AssessmentStatus.COMPLETE, 0, 0,
     )
     DromProfitTheme {
         SelectionScreen(

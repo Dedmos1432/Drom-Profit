@@ -178,7 +178,7 @@ fun Panel(
 }
 
 @Composable
-fun PriceText(value: Number?, modifier: Modifier = Modifier) {
+fun PriceText(value: Long?, modifier: Modifier = Modifier) {
     Text(formatRubles(value), modifier = modifier, style = MaterialTheme.typography.headlineMedium)
 }
 
@@ -186,7 +186,7 @@ fun PriceText(value: Number?, modifier: Modifier = Modifier) {
 fun AmountLine(
     modifier: Modifier = Modifier,
     label: String,
-    value: Number?,
+    value: Long?,
     strong: Boolean = false,
     missingText: String = "Не указано",
 ) {
@@ -204,11 +204,11 @@ fun AmountLine(
     }
 }
 
-fun formatRubles(value: Number?): String = value?.let { "${formatInteger(it)}\u00A0₽" } ?: "Не указано"
+fun formatRubles(value: Long?): String = value?.let { "${formatInteger(it)}\u00A0₽" } ?: "Не указано"
 
 internal fun formatMileage(value: Long?): String = value?.let { "${formatInteger(it)} км" } ?: "Пробег не указан"
 
-private fun formatInteger(value: Number): String =
+private fun formatInteger(value: Long): String =
     NumberFormat.getIntegerInstance(Locale.forLanguageTag("ru-RU")).format(value)
 
 internal fun vehicleName(car: Car): String = listOfNotNull("${car.brand} ${car.model}", car.year?.toString()).joinToString(", ")

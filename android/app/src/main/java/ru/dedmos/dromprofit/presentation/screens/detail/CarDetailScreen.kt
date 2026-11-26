@@ -45,7 +45,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import java.math.BigInteger
 import java.net.URI
 import java.text.NumberFormat
 import java.util.Locale
@@ -208,7 +207,7 @@ private fun VehicleDetails(
             onRetry = onRetry,
         )
     }
-    VehicleGallery(imageUrl = car.imageUrl, contentDescription = name)
+    VehicleGallery(imageUrls = car.imageUrls, contentDescription = name)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         PageHeading(title = name)
         ProfitBadge(
@@ -356,7 +355,7 @@ private fun FinancialSummary(
                     }
                 }
             }
-            if (summary != null && summary.adjustedCost.signum() < 0) {
+            if (summary != null && summary.adjustedCost < 0) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     ProfitBadge("Скорректированная стоимость ниже нуля", BadgeTone.WARNING)
                     DetailHint("Проверьте персональную ценность указанных преимуществ.")
@@ -367,7 +366,7 @@ private fun FinancialSummary(
 }
 
 @Composable
-private fun SummaryAmount(label: String, value: Number?) {
+private fun SummaryAmount(label: String, value: Long?) {
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(label, Modifier.weight(1f))
         Text(
@@ -380,7 +379,7 @@ private fun SummaryAmount(label: String, value: Number?) {
 }
 
 @Composable
-private fun SummaryTotal(label: String, value: Number?) {
+private fun SummaryTotal(label: String, value: Long?) {
     HorizontalDivider()
     Column(Modifier.padding(vertical = 3.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, fontWeight = FontWeight.SemiBold)
@@ -464,10 +463,10 @@ private fun CarDetailPreview() {
     val summary = Summary(
         carId = car.id,
         listingPrice = car.price,
-        totalExpenses = BigInteger.ZERO,
-        totalBenefits = BigInteger.ZERO,
-        acquisitionCost = BigInteger.valueOf(car.price),
-        adjustedCost = BigInteger.valueOf(car.price),
+        totalExpenses = 0L,
+        totalBenefits = 0L,
+        acquisitionCost = car.price,
+        adjustedCost = car.price,
         assessmentStatus = AssessmentStatus.INCOMPLETE,
         unknownExpenses = 1,
         unknownBenefits = 0,

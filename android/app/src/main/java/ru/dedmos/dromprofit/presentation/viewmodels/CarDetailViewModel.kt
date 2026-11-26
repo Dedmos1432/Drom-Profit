@@ -88,32 +88,14 @@ class CarDetailViewModel @Inject constructor(
         reviewBenefits(id, checked)
     }
 
-    internal fun saveExpense(input: ExpenseInput, id: String?) {
-        val current = state.value.car?.expenses?.firstOrNull { it.id == id }
-        if (current != null && ExpenseInput(current.title, current.kind, current.amount, current.factorKey, current.comment) == input) {
-            showDialog(null)
-            return
-        }
-        mutate { carId -> saveExpense(carId, input, id) }
-    }
+    internal fun saveExpense(input: ExpenseInput, original: Expense?) =
+        mutate { carId -> saveExpense(carId, input, original) }
 
-    internal fun saveBenefit(input: BenefitInput, id: String?) {
-        val current = state.value.car?.benefits?.firstOrNull { it.id == id }
-        if (current != null && BenefitInput(current.title, current.amount, current.factorKey, current.comment) == input) {
-            showDialog(null)
-            return
-        }
-        mutate { carId -> saveBenefit(carId, input, id) }
-    }
+    internal fun saveBenefit(input: BenefitInput, original: Benefit?) =
+        mutate { carId -> saveBenefit(carId, input, original) }
 
-    internal fun saveNote(input: NoteInput, id: String?) {
-        val current = state.value.car?.notes?.firstOrNull { it.id == id }
-        if (current != null && NoteInput(current.kind, current.text) == input) {
-            showDialog(null)
-            return
-        }
-        mutate(refreshSummary = false) { carId -> saveNote(carId, input, id) }
-    }
+    internal fun saveNote(input: NoteInput, original: Note?) =
+        mutate(refreshSummary = false) { carId -> saveNote(carId, input, original) }
 
     internal fun confirmDelete() {
         when (val dialog = state.value.dialog) {

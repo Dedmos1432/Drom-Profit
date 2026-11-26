@@ -16,6 +16,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -69,20 +70,22 @@ internal fun VehicleForm(
     var values by rememberSaveable {
         mutableStateOf(CarField.entries.map { initial.initialValue(it).orEmpty() })
     }
+    var clearPhotos by rememberSaveable { mutableStateOf(false) }
     var attempts by rememberSaveable { mutableIntStateOf(0) }
     var scrollTo by remember { mutableStateOf<CarField?>(null) }
     val focusManager = LocalFocusManager.current
 
-    val errors = if (attempts > 0) values.validationErrors(initial) else emptyMap()
+    val errors = if (attempts > 0) values.validationErrors(initial, clearPhotos) else emptyMap()
     val updateValue: (CarField, String) -> Unit = { field, value ->
         values = values.mapIndexed { index, current -> if (index == field.ordinal) value else current }
+        if (field == CarField.IMAGE_URL) clearPhotos = false
         onChange()
     }
     val submit: () -> Unit = {
         focusManager.clearFocus()
-        val invalid = values.validationErrors(initial).keys.firstOrNull()
+        val invalid = values.validationErrors(initial, clearPhotos).keys.firstOrNull()
         if (invalid == null) {
-            onSubmit(values.toCarInput(initial))
+            onSubmit(values.toCarInput(initial, clearPhotos))
         } else {
             scrollTo = invalid
             attempts++
@@ -98,6 +101,15 @@ internal fun VehicleForm(
         CarFieldGroup("Основные данные", basicFields, values, errors, enabled, scrollTo, attempts, updateValue)
         CarFieldGroup("Характеристики", characteristicFields, values, errors, enabled, scrollTo, attempts, updateValue)
         CarFieldGroup("Объявление и фото", listingFields, values, errors, enabled, scrollTo, attempts, updateValue)
+        if (!initial?.imageUrls.isNullOrEmpty()) {
+            TextButton(onClick = {
+                clearPhotos = !clearPhotos
+                onChange()
+            }, enabled = enabled) {
+                Text(if (clearPhotos) "Отменить очистку галереи" else "Очистить галерею")
+            }
+            if (clearPhotos) Text("Фотографии будут удалены при сохранении.", style = MaterialTheme.typography.bodySmall)
+        }
         if (saveError != null) FormAlert("Не удалось сохранить автомобиль", saveError)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(

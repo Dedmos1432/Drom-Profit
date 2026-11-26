@@ -138,6 +138,7 @@ class CarFormViewModel @Inject constructor(
                 val message = when ((error as? RepositoryException)?.code) {
                     "not_found" -> "Автомобиль недоступен. Проверьте выборку."
                     "validation_error" -> "Проверьте заполненные поля. Введённые данные остались в форме."
+                    "amount_out_of_range" -> "Цена и указанная рыночная оценка должны быть от 1 до 1 000 000 000 000 ₽."
                     else -> "Введённые данные остались в форме. Повторите попытку."
                 }
                 mutableState.update { it.copy(saveError = message, saving = false) }

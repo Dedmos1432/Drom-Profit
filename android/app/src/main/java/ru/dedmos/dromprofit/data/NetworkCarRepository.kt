@@ -31,6 +31,7 @@ import ru.dedmos.dromprofit.domain.Note
 import ru.dedmos.dromprofit.domain.NoteInput
 import ru.dedmos.dromprofit.domain.repository.RepositoryException
 import ru.dedmos.dromprofit.domain.Summary
+import ru.dedmos.dromprofit.domain.toInput
 import java.io.IOException
 
 internal class NetworkCarRepository(
@@ -74,7 +75,7 @@ internal class NetworkCarRepository(
 
     override suspend fun createCar(input: CarInput): Car = authorizedWithMirror { service, token ->
         val car = service.createCar(token, input.toJson().asBody()).readObject().readCar()
-        mirror?.save(token, car) ?: car
+        mirror?.save(token, car, hasGallery = false) ?: car
     }
 
     override suspend fun updateCar(original: Car, input: CarInput): Car {
@@ -102,51 +103,63 @@ internal class NetworkCarRepository(
                 service.updateCar(token, carId, body.asBody())
             }
             val car = response.readObject().readCar()
-            mirror?.save(token, car) ?: car
+            mirror?.save(token, car, hasGallery = body.size() == 0) ?: car
         }
 
     override suspend fun deleteCar(carId: String) {
         mutateRecord(carId) { service, token -> service.deleteCar(token, carId).checkDeleted() }
     }
 
-    override suspend fun saveExpense(carId: String, input: ExpenseInput, expenseId: String?): Expense =
-        mutateRecord(carId) { service, token ->
-            val body = input.toJson().asBody()
-            val response = if (expenseId == null) {
-                service.createExpense(token, carId, body)
+    override suspend fun saveExpense(carId: String, input: ExpenseInput, original: Expense?): Expense {
+        val body = input.toJson()
+        if (original != null && body.keepChangesFrom(original.toInput().toJson()).size() == 0) {
+            return original
+        }
+        return mutateRecord(carId) { service, token ->
+            val response = if (original == null) {
+                service.createExpense(token, carId, body.asBody())
             } else {
-                service.updateExpense(token, carId, expenseId, body)
+                service.updateExpense(token, carId, original.id, body.asBody())
             }
             response.readObject().readExpense()
         }
+    }
 
     override suspend fun deleteExpense(carId: String, expenseId: String) =
         mutateRecord(carId) { service, token -> service.deleteExpense(token, carId, expenseId).checkDeleted() }
 
-    override suspend fun saveBenefit(carId: String, input: BenefitInput, benefitId: String?): Benefit =
-        mutateRecord(carId) { service, token ->
-            val body = input.toJson().asBody()
-            val response = if (benefitId == null) {
-                service.createBenefit(token, carId, body)
+    override suspend fun saveBenefit(carId: String, input: BenefitInput, original: Benefit?): Benefit {
+        val body = input.toJson()
+        if (original != null && body.keepChangesFrom(original.toInput().toJson()).size() == 0) {
+            return original
+        }
+        return mutateRecord(carId) { service, token ->
+            val response = if (original == null) {
+                service.createBenefit(token, carId, body.asBody())
             } else {
-                service.updateBenefit(token, carId, benefitId, body)
+                service.updateBenefit(token, carId, original.id, body.asBody())
             }
             response.readObject().readBenefit()
         }
+    }
 
     override suspend fun deleteBenefit(carId: String, benefitId: String) =
         mutateRecord(carId) { service, token -> service.deleteBenefit(token, carId, benefitId).checkDeleted() }
 
-    override suspend fun saveNote(carId: String, input: NoteInput, noteId: String?): Note =
-        mutateRecord(carId) { service, token ->
-            val body = input.toJson().asBody()
-            val response = if (noteId == null) {
-                service.createNote(token, carId, body)
+    override suspend fun saveNote(carId: String, input: NoteInput, original: Note?): Note {
+        val body = input.toJson()
+        if (original != null && body.keepChangesFrom(original.toInput().toJson()).size() == 0) {
+            return original
+        }
+        return mutateRecord(carId) { service, token ->
+            val response = if (original == null) {
+                service.createNote(token, carId, body.asBody())
             } else {
-                service.updateNote(token, carId, noteId, body)
+                service.updateNote(token, carId, original.id, body.asBody())
             }
             response.readObject().readNote()
         }
+    }
 
     override suspend fun deleteNote(carId: String, noteId: String) =
         mutateRecord(carId) { service, token -> service.deleteNote(token, carId, noteId).checkDeleted() }

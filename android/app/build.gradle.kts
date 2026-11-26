@@ -52,6 +52,12 @@ android {
         val calculationVectors = sharedFixtures.resolve("calculation-tests.json")
         test.inputs.file(calculationVectors)
         test.systemProperty("dromProfitCalculationVectors", calculationVectors.absolutePath)
+        test.inputs.files(
+            sharedFixtures.resolve("money-contract-tests.json"),
+            sharedFixtures.resolve("demo-showcase.json"),
+            sharedFixtures.resolve("demo-showcase-assessments.json"),
+        )
+        test.systemProperty("dromProfitSharedFixtures", sharedFixtures.absolutePath)
     }
 
     buildTypes {

@@ -39,3 +39,7 @@ data class BenefitInput(
 data class Note(val id: String, val kind: NoteKind, val text: String)
 
 data class NoteInput(val kind: NoteKind, val text: String)
+
+internal fun Expense.toInput() = ExpenseInput(title, kind, amount, factorKey, comment)
+internal fun Benefit.toInput() = BenefitInput(title, amount, factorKey, comment)
+internal fun Note.toInput() = NoteInput(kind, text)

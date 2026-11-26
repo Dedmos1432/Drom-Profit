@@ -1,5 +1,6 @@
 package ru.dedmos.dromprofit.data
 
+import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import ru.dedmos.dromprofit.domain.AssessmentStatus
@@ -16,6 +17,8 @@ import ru.dedmos.dromprofit.domain.ListingData
 import ru.dedmos.dromprofit.domain.Note
 import ru.dedmos.dromprofit.domain.NoteInput
 import ru.dedmos.dromprofit.domain.Summary
+import ru.dedmos.dromprofit.domain.MaxCarPhotos
+import ru.dedmos.dromprofit.domain.photosWithCover
 import ru.dedmos.dromprofit.domain.toListingData
 
 internal fun ListingData.toCarInput(
@@ -24,7 +27,7 @@ internal fun ListingData.toCarInput(
     price: Long = requireNotNull(this.price)
 ) = CarInput(
     source, brand, model, price, sourceUrl, listingId, fetchedAt, year, mileage,
-    engineVolume, transmission, imageUrl, trim, engineType, enginePower, driveType, city, marketPrice
+    engineVolume, transmission, imageUrl, trim, engineType, enginePower, driveType, city, marketPrice, imageUrls
 )
 
 internal fun CarInput.toCar(
@@ -44,7 +47,7 @@ internal fun CarInput.toCar(
     mileage = mileage,
     engineVolume = engineVolume,
     transmission = transmission,
-    imageUrl = imageUrl,
+    imageUrl = imageUrls?.firstOrNull() ?: imageUrl,
     trim = trim,
     engineType = engineType,
     enginePower = enginePower,
@@ -58,7 +61,8 @@ internal fun CarInput.toCar(
     benefitsReviewed = benefitsReviewed,
     expenses = expenses,
     benefits = benefits,
-    notes = notes
+    notes = notes,
+    imageUrls = imageUrls?.distinct() ?: listOfNotNull(imageUrl)
 )
 
 internal fun CarInput.toJson(): JsonObject = JsonObject().apply {
@@ -71,7 +75,11 @@ internal fun CarInput.toJson(): JsonObject = JsonObject().apply {
     addProperty("mileage_km", mileage)
     addProperty("engine_volume_l", engineVolume)
     addProperty("transmission", transmission)
-    addProperty("image_url", imageUrl)
+    imageUrls?.let { photos ->
+        require(photos.size <= MaxCarPhotos && (imageUrl == null || photos.firstOrNull() == imageUrl))
+        add("image_urls", JsonArray().apply { photos.forEach { add(it) } })
+    }
+    addProperty("image_url", imageUrls?.firstOrNull() ?: imageUrl)
     addProperty("trim", trim)
     addProperty("fuel_type", engineType)
     addProperty("power_hp", enginePower)
@@ -88,11 +96,34 @@ internal fun CarInput.changesFrom(original: Car): JsonObject {
         remove("source")
         remove("listing_id")
         remove("fetched_at")
-        for (name in keySet().toList()) {
-            if (get(name) == previous.get(name)) remove(name)
+        remove("image_urls")
+        remove("image_url")
+        keepChangesFrom(previous)
+
+        val photos = imageUrls
+        if (photos != null && photos != original.imageUrls) {
+            val cover = photos.firstOrNull()
+            if (cover != original.imageUrl && photos == photosWithCover(original.imageUrls, cover)) {
+                addProperty("image_url", cover)
+            } else {
+                add("image_urls", JsonArray().apply { photos.forEach { add(it) } })
+            }
+        } else if (photos == null && imageUrl != original.imageUrl) {
+            addProperty("image_url", imageUrl)
         }
     }
 }
+
+internal fun JsonObject.keepChangesFrom(original: JsonObject): JsonObject = apply {
+    for (name in keySet().toList()) {
+        if (get(name) == original.get(name)) remove(name)
+    }
+}
+
+internal fun JsonObject.applyChanges(changes: JsonObject): JsonObject = apply {
+    changes.entrySet().forEach { (name, value) -> add(name, value) }
+}
+
 
 internal fun ExpenseInput.toJson(): JsonObject = JsonObject().apply {
     addProperty("title", title)
@@ -127,6 +158,7 @@ internal fun JsonObject.readListing() = ListingData(
     engineVolume = optional("engine_volume_l")?.let { it.numberText().toDouble().also { value -> require(value.isFinite()) } },
     transmission = stringOrNull("transmission"),
     imageUrl = stringOrNull("image_url"),
+    imageUrls = readImageUrls(),
     trim = stringOrNull("trim"),
     engineType = stringOrNull("fuel_type"),
     enginePower = longOrNull("power_hp"),
@@ -134,6 +166,19 @@ internal fun JsonObject.readListing() = ListingData(
     city = stringOrNull("city"),
     marketPrice = longOrNull("market_valuation")
 )
+
+private fun JsonObject.readImageUrls(): List<String> {
+    val cover = stringOrNull("image_url")
+    val gallery = get("image_urls") ?: return listOfNotNull(cover)
+    val photos = gallery.asJsonArray
+    require(photos.size() <= MaxCarPhotos)
+    val urls = photos.map {
+        require(it.asJsonPrimitive.isString)
+        it.asString
+    }
+    require(urls.firstOrNull() == cover)
+    return urls.distinct()
+}
 
 internal fun JsonObject.readCar() = readListing().toCarInput().toCar(
     id = requiredString("id"),
@@ -170,10 +215,10 @@ internal fun JsonObject.readNote() = Note(
 internal fun JsonObject.readSummary() = Summary(
     carId = requiredString("car_id"),
     listingPrice = required("listing_price").numberText().toLong(),
-    totalExpenses = required("total_expenses").numberText().toBigInteger(),
-    totalBenefits = required("total_benefits").numberText().toBigInteger(),
-    acquisitionCost = required("acquisition_cost").numberText().toBigInteger(),
-    adjustedCost = required("adjusted_cost").numberText().toBigInteger(),
+    totalExpenses = required("total_expenses").numberText().toLong(),
+    totalBenefits = required("total_benefits").numberText().toLong(),
+    acquisitionCost = required("acquisition_cost").numberText().toLong(),
+    adjustedCost = required("adjusted_cost").numberText().toLong(),
     assessmentStatus = requiredEnum<AssessmentStatus>("assessment_status"),
     unknownExpenses = required("unknown_expenses").numberText().toInt(),
     unknownBenefits = required("unknown_benefits").numberText().toInt()
@@ -183,7 +228,7 @@ internal fun JsonObject.readComparison() = Comparison(
     items = objects("items").map { item ->
         ComparisonItem(
             summary = item.readSummary(),
-            differenceFromMin = item.optional("difference_from_min")?.numberText()?.toBigInteger()
+            differenceFromMin = item.optional("difference_from_min")?.numberText()?.toLong()
         )
     },
     warnings = objects("warnings").map { warning ->

@@ -38,11 +38,16 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import ru.dedmos.dromprofit.domain.Benefit
 import ru.dedmos.dromprofit.domain.BenefitInput
+import ru.dedmos.dromprofit.domain.Expense
 import ru.dedmos.dromprofit.domain.ExpenseInput
 import ru.dedmos.dromprofit.domain.ExpenseKind
+import ru.dedmos.dromprofit.domain.Note
 import ru.dedmos.dromprofit.domain.NoteInput
 import ru.dedmos.dromprofit.domain.NoteKind
+import ru.dedmos.dromprofit.domain.MaxMoney
+import ru.dedmos.dromprofit.presentation.forms.asRubles
 import ru.dedmos.dromprofit.presentation.components.ErrorState
 import ru.dedmos.dromprofit.presentation.viewmodels.DetailDialog
 
@@ -52,9 +57,9 @@ internal fun CarRecordDialog(
     busy: Boolean,
     error: String?,
     onDismiss: () -> Unit,
-    onSaveExpense: (ExpenseInput, String?) -> Unit,
-    onSaveBenefit: (BenefitInput, String?) -> Unit,
-    onSaveNote: (NoteInput, String?) -> Unit,
+    onSaveExpense: (ExpenseInput, Expense?) -> Unit,
+    onSaveBenefit: (BenefitInput, Benefit?) -> Unit,
+    onSaveNote: (NoteInput, Note?) -> Unit,
     onDelete: () -> Unit,
 ) {
     key(dialog) {
@@ -69,7 +74,7 @@ internal fun CarRecordDialog(
                     error = error,
                     onDismiss = onDismiss,
                 ) { draft, kind ->
-                    if (kind != null) onSaveExpense(ExpenseInput(draft.title, kind, draft.amount, draft.factorKey, draft.comment), expense?.id)
+                    if (kind != null) onSaveExpense(ExpenseInput(draft.title, kind, draft.amount, draft.factorKey, draft.comment), expense)
                 }
             }
             is DetailDialog.EditBenefit -> {
@@ -82,7 +87,7 @@ internal fun CarRecordDialog(
                     error = error,
                     onDismiss = onDismiss,
                 ) { draft, _ ->
-                    onSaveBenefit(BenefitInput(draft.title, draft.amount, draft.factorKey, draft.comment), benefit?.id)
+                    onSaveBenefit(BenefitInput(draft.title, draft.amount, draft.factorKey, draft.comment), benefit)
                 }
             }
             is DetailDialog.EditNote -> NoteEditor(dialog, busy, error, onDismiss, onSaveNote)
@@ -119,7 +124,7 @@ private fun MoneyEditor(
     var showEquipment by rememberSaveable { mutableStateOf(false) }
     var kind by rememberSaveable { mutableStateOf(initialKind) }
     var submitted by rememberSaveable { mutableStateOf(false) }
-    val parsedAmount = amount.trim().takeIf { it.all(Char::isDigit) }?.toLongOrNull()
+    val parsedAmount = amount.trim().asRubles()?.takeIf { it in 0L..MaxMoney }
     val invalidName = name.isBlank()
     val invalidAmount = !amountUnknown && parsedAmount == null
 
@@ -154,7 +159,7 @@ private fun MoneyEditor(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 isError = submitted && invalidAmount,
                 supportingText = if (submitted && invalidAmount) {
-                    { Text("Укажите целое число рублей или отметьте неизвестную сумму.") }
+                    { Text("Укажите целое число от 0 до 1 000 000 000 000 ₽ или отметьте неизвестную сумму.") }
                 } else null,
                 enabled = !busy,
                 shape = MaterialTheme.shapes.medium,
@@ -209,7 +214,7 @@ private fun NoteEditor(
     busy: Boolean,
     error: String?,
     onDismiss: () -> Unit,
-    onSave: (NoteInput, String?) -> Unit,
+    onSave: (NoteInput, Note?) -> Unit,
 ) {
     var kind by rememberSaveable { mutableStateOf(dialog.note?.kind ?: NoteKind.INSPECTION) }
     var text by rememberSaveable { mutableStateOf(dialog.note?.text.orEmpty()) }
@@ -222,7 +227,7 @@ private fun NoteEditor(
         onDismiss = onDismiss,
         onConfirm = {
             submitted = true
-            if (text.isNotBlank()) onSave(NoteInput(kind, text.trim()), dialog.note?.id)
+            if (text.isNotBlank()) onSave(NoteInput(kind, text.trim()), dialog.note)
         },
     ) {
         CategoryMenu("Вид заметки", kind, NoteKind.entries, { it.detailTitle }, !busy) { kind = it }

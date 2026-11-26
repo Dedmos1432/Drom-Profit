@@ -8,6 +8,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import ru.dedmos.dromprofit.data.local.ProfitDatabase
+import ru.dedmos.dromprofit.data.local.ProfitDatabaseMigration1To2
 import ru.dedmos.dromprofit.data.local.SelectionIdsStore
 import ru.dedmos.dromprofit.domain.usecases.comparison.RememberComparisonUseCase
 import ru.dedmos.dromprofit.domain.usecases.detail.CarDetailUseCases
@@ -24,7 +25,9 @@ object DataModule {
     @Provides
     @Singleton
     internal fun provideProfitDatabase(@ApplicationContext context: Context): ProfitDatabase =
-        Room.databaseBuilder(context, ProfitDatabase::class.java, "drom-profit.db").build()
+        Room.databaseBuilder(context, ProfitDatabase::class.java, "drom-profit.db")
+            .addMigrations(ProfitDatabaseMigration1To2)
+            .build()
 
     @Provides
     @Singleton

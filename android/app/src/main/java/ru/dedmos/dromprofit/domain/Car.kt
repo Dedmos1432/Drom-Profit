@@ -25,7 +25,8 @@ data class Car(
     val benefitsReviewed: Boolean = false,
     val expenses: List<Expense> = emptyList(),
     val benefits: List<Benefit> = emptyList(),
-    val notes: List<Note> = emptyList()
+    val notes: List<Note> = emptyList(),
+    val imageUrls: List<String> = listOfNotNull(imageUrl)
 )
 
 enum class CarSource { DROM, DEMO, MANUAL }
@@ -48,7 +49,8 @@ data class ListingData(
     val enginePower: Long? = null,
     val driveType: String? = null,
     val city: String? = null,
-    val marketPrice: Long? = null
+    val marketPrice: Long? = null,
+    val imageUrls: List<String> = listOfNotNull(imageUrl)
 )
 
 data class CarInput(
@@ -69,5 +71,6 @@ data class CarInput(
     val enginePower: Long? = null,
     val driveType: String? = null,
     val city: String? = null,
-    val marketPrice: Long? = null
+    val marketPrice: Long? = null,
+    val imageUrls: List<String>? = null
 )

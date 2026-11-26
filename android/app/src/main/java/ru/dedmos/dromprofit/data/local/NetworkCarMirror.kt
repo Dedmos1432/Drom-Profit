@@ -8,12 +8,12 @@ import java.security.MessageDigest
 internal class NetworkCarMirror(private val cars: CarDao, private val endpointKey: String) {
     suspend fun replace(authorization: String, selection: List<Car>): List<Car> = withMirror(selection) {
         val scope = scope(authorization)
-        val rows = selection.mapIndexed { index, car -> car.toEntity(scope, index.toLong()) }
+        val rows = selection.mapIndexed { index, car -> car.toEntity(scope, index.toLong(), hasGallery = false) }
         cars.replaceSelection(scope, rows).map(CarEntity::toDomain)
     }
 
-    suspend fun save(authorization: String, car: Car): Car = withMirror(car) {
-        cars.saveCar(car.toEntity(scope(authorization))).toDomain()
+    suspend fun save(authorization: String, car: Car, hasGallery: Boolean = true): Car = withMirror(car) {
+        cars.saveCar(car.toEntity(scope(authorization), hasGallery = hasGallery)).toDomain()
     }
 
     suspend fun invalidate(authorization: String, carId: String) = withMirror(Unit) {

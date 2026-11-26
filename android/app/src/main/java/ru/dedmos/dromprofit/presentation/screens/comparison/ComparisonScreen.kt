@@ -38,7 +38,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import java.math.BigInteger
 import kotlinx.coroutines.flow.StateFlow
 import ru.dedmos.dromprofit.domain.AssessmentStatus
 import ru.dedmos.dromprofit.domain.Car
@@ -156,7 +155,7 @@ private fun ComparisonWarnings(
         val affected = columns.filter { column ->
             when (code) {
                 "incomplete" -> column.item.summary.assessmentStatus == AssessmentStatus.INCOMPLETE
-                "negative_adjusted_cost" -> column.item.summary.adjustedCost.signum() < 0
+                "negative_adjusted_cost" -> column.item.summary.adjustedCost < 0
                 "double_count" -> column.car.expenses.any { it.kind == ExpenseKind.MISSING_EQUIPMENT && it.factorKey in keys } ||
                     column.car.benefits.any { it.factorKey in keys }
                 else -> false
@@ -219,7 +218,7 @@ private fun ComparisonTable(
             MoneyLine("Затраты на приобретение", columns, horizontal, strong = true) { it.summary.acquisitionCost }
             MoneyLine("Ценность преимуществ", columns, horizontal) { it.summary.totalBenefits }
             TableLine("Скорректированная стоимость", columns, horizontal) { column ->
-                val minimum = showMinimum && column.item.differenceFromMin == BigInteger.ZERO
+                val minimum = showMinimum && column.item.differenceFromMin == 0L
                 Column(
                     Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small)
                         .background(if (minimum) colors.secondaryContainer else Color.Transparent)
@@ -284,7 +283,7 @@ private fun MoneyLine(
     columns: List<ComparisonColumn>,
     scroll: ScrollState,
     strong: Boolean = false,
-    amount: (ComparisonItem) -> Number?,
+    amount: (ComparisonItem) -> Long?,
 ) {
     TableLine(label, columns, scroll) { column ->
         Text(
@@ -371,13 +370,13 @@ private fun ComparisonPreview() {
     )
     val second = first.copy(id = "accord", brand = "Honda", model = "Accord", year = 2016, price = 1_350_000, imageUrl = "/demo/vehicles/accord-ix.jpg")
     val summary = Summary(
-        first.id, first.price, 33_000.toBigInteger(), 25_000.toBigInteger(), 1_233_000.toBigInteger(),
-        1_208_000.toBigInteger(), AssessmentStatus.COMPLETE, 0, 0,
+        first.id, first.price, 33_000L, 25_000L, 1_233_000L,
+        1_208_000L, AssessmentStatus.COMPLETE, 0, 0,
     )
     val result = Comparison(
         listOf(
-            ComparisonItem(summary, BigInteger.ZERO),
-            ComparisonItem(summary.copy(carId = second.id, listingPrice = second.price, assessmentStatus = AssessmentStatus.INCOMPLETE, unknownExpenses = 1), 147_000.toBigInteger()),
+            ComparisonItem(summary, 0L),
+            ComparisonItem(summary.copy(carId = second.id, listingPrice = second.price, assessmentStatus = AssessmentStatus.INCOMPLETE, unknownExpenses = 1), 147_000L),
         ),
         listOf(ComparisonWarning("incomplete", "Часть данных требует уточнения")),
         provisional = true,

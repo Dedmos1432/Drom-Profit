@@ -13,6 +13,7 @@ fun Car.toListingData() = ListingData(
     engineVolume = engineVolume,
     transmission = transmission,
     imageUrl = imageUrl,
+    imageUrls = imageUrls,
     trim = trim,
     engineType = engineType,
     enginePower = enginePower,

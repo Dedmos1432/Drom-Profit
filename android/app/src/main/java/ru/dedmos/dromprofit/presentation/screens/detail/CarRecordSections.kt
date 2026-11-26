@@ -56,7 +56,7 @@ internal val NoteKind.detailTitle: String
 @Composable
 internal fun ExpensesSection(
     expenses: List<Expense>,
-    knownTotal: Number?,
+    knownTotal: Long?,
     reviewed: Boolean,
     enabled: Boolean,
     reviewAvailable: Boolean,
@@ -96,7 +96,7 @@ internal fun ExpensesSection(
 @Composable
 internal fun BenefitsSection(
     benefits: List<Benefit>,
-    knownTotal: Number?,
+    knownTotal: Long?,
     reviewed: Boolean,
     enabled: Boolean,
     reviewAvailable: Boolean,
@@ -137,7 +137,7 @@ internal fun BenefitsSection(
 private fun MoneyFactorsSection(
     expense: Boolean,
     isEmpty: Boolean,
-    knownTotal: Number?,
+    knownTotal: Long?,
     reviewed: Boolean,
     enabled: Boolean,
     reviewAvailable: Boolean,
@@ -222,7 +222,7 @@ private fun MoneyRecord(
 @Composable
 private fun ReviewPanel(
     expense: Boolean,
-    knownTotal: Number?,
+    knownTotal: Long?,
     isEmpty: Boolean,
     reviewed: Boolean,
     enabled: Boolean,

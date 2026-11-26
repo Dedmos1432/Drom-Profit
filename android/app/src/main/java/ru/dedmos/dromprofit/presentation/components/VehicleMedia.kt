@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -38,6 +39,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -47,18 +49,15 @@ import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONObject
 import ru.dedmos.dromprofit.BuildConfig
+import ru.dedmos.dromprofit.data.DemoPhotoDirectory
+import ru.dedmos.dromprofit.data.demoPhotoAsset
+import ru.dedmos.dromprofit.data.parseDemoPhoto
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 
-private const val AssetDirectory = "demo/vehicles/"
-private const val AssetPrefix = "file:///android_asset/" + AssetDirectory
 private const val MaxRemoteBytes = 8 * 1024 * 1024
 private const val MaxDecodedPixels = 4_000_000L
-private val DemoFileName = Regex("[a-z0-9-]+\\.jpg")
-private val DemoGalleryId = Regex("[0-9]{3}")
-
-private data class DemoPhoto(val name: String, val galleryId: String?)
 private data class GalleryFrame(val url: String, val description: String)
 private data class PhotoRequest(val url: String, val sampleSize: Int)
 private data class PhotoResult(val request: PhotoRequest, val bitmap: Bitmap?)
@@ -67,18 +66,8 @@ private val photoCache = object : LruCache<PhotoRequest, Bitmap>(16 * 1024 * 102
     override fun sizeOf(key: PhotoRequest, value: Bitmap): Int = value.byteCount
 }
 
-private fun parseDemoPhoto(imageUrl: String?): DemoPhoto? {
-    val path = imageUrl?.takeIf { it.startsWith(AssetPrefix) }?.removePrefix(AssetPrefix) ?: return null
-    val file = path.substringBefore('?')
-    if (!DemoFileName.matches(file)) return null
-    val query = path.substringAfter('?', "")
-    val galleryId = query.removePrefix("gallery=").takeIf {
-        query.startsWith("gallery=") && DemoGalleryId.matches(it)
-    }
-    return DemoPhoto(file, galleryId)
-}
-
-internal fun isDemoModelPhoto(imageUrl: String?): Boolean = parseDemoPhoto(imageUrl) != null
+internal fun isDemoModelPhoto(imageUrl: String?): Boolean =
+    BuildConfig.DEBUG && parseDemoPhoto(imageUrl) != null
 
 @Composable
 fun VehiclePhoto(
@@ -91,15 +80,23 @@ fun VehiclePhoto(
 
 @Composable
 fun VehicleGallery(
-    imageUrl: String?,
+    imageUrls: List<String>,
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
 ) {
+    val imageUrl = imageUrls.firstOrNull()
     val assets = LocalContext.current.assets
-    val frames by produceState(emptyList<GalleryFrame>(), imageUrl, assets) {
-        value = withContext(Dispatchers.IO) { readGallery(assets, imageUrl) }
+    val legacyFrames by key(imageUrls, assets) {
+        produceState(emptyList<GalleryFrame>()) {
+            if (BuildConfig.DEBUG && imageUrls.size == 1) {
+                value = withContext(Dispatchers.IO) { readLegacyGallery(assets, imageUrl) }
+            }
+        }
     }
-    var selectedIndex by rememberSaveable(imageUrl) { mutableIntStateOf(0) }
+    val frames = legacyFrames.ifEmpty {
+        imageUrls.mapIndexed { index, url -> GalleryFrame(url, "фотография " + (index + 1)) }
+    }
+    var selectedIndex by rememberSaveable(imageUrls) { mutableIntStateOf(0) }
     val frame = frames.getOrNull(selectedIndex)
     val mainDescription = when {
         frame == null -> contentDescription
@@ -129,20 +126,24 @@ fun VehicleGallery(
 
                     VehiclePhoto(
                         imageUrl = thumbnail.url,
-                        contentDescription = thumbnail.description.replaceFirstChar(Char::titlecase),
                         modifier = Modifier.size(96.dp, 72.dp)
                             .clip(MaterialTheme.shapes.medium)
                             .border(if (isSelected) 2.dp else 1.dp, border, MaterialTheme.shapes.medium)
-                            .semantics { selected = isSelected }
+                            .semantics {
+                                selected = isSelected
+                                this.contentDescription = thumbnail.description.replaceFirstChar(Char::titlecase)
+                            }
                             .clickable(role = Role.Button) { selectedIndex = index },
                     )
                 }
             }
-            Text(
-                "Иллюстративные фотографии модели",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (isDemoModelPhoto(imageUrl)) {
+                Text(
+                    "Иллюстративные фотографии модели",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
@@ -203,29 +204,31 @@ private fun VehiclePicture(
     }
 }
 
-private fun readGallery(assets: AssetManager, url: String?): List<GalleryFrame> {
+private fun readLegacyGallery(assets: AssetManager, url: String?): List<GalleryFrame> {
     val cover = parseDemoPhoto(url) ?: return emptyList()
     val id = cover.galleryId ?: return emptyList()
 
     return runCatching {
-        val value = assets.open(AssetDirectory + "gallery-index.json").bufferedReader().use { it.readText() }
+        val value = assets.open(DemoPhotoDirectory + "/gallery-index.json").bufferedReader().use { it.readText() }
         val gallery = JSONObject(value).getJSONArray(id)
         require(gallery.getJSONArray(0).getString(0) == cover.name)
         List(gallery.length()) { index ->
             val photo = gallery.getJSONArray(index)
             val filename = photo.getString(0)
-            require(DemoFileName.matches(filename))
-            GalleryFrame(AssetPrefix + filename, photo.getString(1))
+            GalleryFrame("/" + DemoPhotoDirectory + "/" + filename, photo.getString(1))
         }
     }.getOrDefault(emptyList())
 }
 
 private fun loadBitmap(assets: AssetManager, request: PhotoRequest): Bitmap? = try {
-    val demo = parseDemoPhoto(request.url)
-    if (demo == null) {
+    val demoAsset = if (BuildConfig.DEBUG && parseDemoPhoto(request.url) != null) {
+        val files = assets.list(DemoPhotoDirectory).orEmpty().toSet()
+        demoPhotoAsset(request.url, files, debug = true)
+    } else null
+    if (demoAsset == null) {
         loadApiBitmap(request)
     } else {
-        assets.open(AssetDirectory + demo.name).use { stream ->
+        assets.open(demoAsset).use { stream ->
             BitmapFactory.decodeStream(stream, null, BitmapFactory.Options().apply {
                 inSampleSize = request.sampleSize
             })

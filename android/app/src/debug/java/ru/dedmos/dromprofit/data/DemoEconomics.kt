@@ -7,17 +7,21 @@ import ru.dedmos.dromprofit.domain.ComparisonItem
 import ru.dedmos.dromprofit.domain.ComparisonWarning
 import ru.dedmos.dromprofit.domain.ExpenseKind
 import ru.dedmos.dromprofit.domain.Summary
-import java.math.BigInteger
+import ru.dedmos.dromprofit.domain.MaxMoney
+import ru.dedmos.dromprofit.domain.repository.RepositoryException
 
 // Debug-only mock of the server responses for offline demonstration.
 internal fun demoSummary(car: Car): Summary {
-    val totalExpenses = car.expenses.mapNotNull { it.amount }.sumOf { it.toBigInteger() }
-    val totalBenefits = car.benefits.mapNotNull { it.amount }.sumOf { it.toBigInteger() }
+    if (car.price !in 1L..MaxMoney) {
+        demoAmountOutOfRange("Цена должна быть от 1 до 1 000 000 000 000 ₽.")
+    }
+    val totalExpenses = demoGroupTotal(car.expenses.map { it.amount })
+    val totalBenefits = demoGroupTotal(car.benefits.map { it.amount })
     val unknownExpenses = car.expenses.count { it.amount == null }
     val unknownBenefits = car.benefits.count { it.amount == null }
     val complete = car.expensesReviewed && car.benefitsReviewed &&
         unknownExpenses == 0 && unknownBenefits == 0
-    val acquisitionCost = car.price.toBigInteger() + totalExpenses
+    val acquisitionCost = car.price + totalExpenses
     return Summary(
         carId = car.id,
         listingPrice = car.price,
@@ -30,6 +34,17 @@ internal fun demoSummary(car: Car): Summary {
         unknownBenefits = unknownBenefits
     )
 }
+
+internal fun demoGroupTotal(amounts: Iterable<Long?>): Long = amounts.fold(0L) { total, amount ->
+    if (amount == null) return@fold total
+    if (amount !in 0L..(MaxMoney - total)) {
+        demoAmountOutOfRange("Сумма расходов или преимуществ не может превышать 1 000 000 000 000 ₽.")
+    }
+    total + amount
+}
+
+internal fun demoAmountOutOfRange(message: String): Nothing =
+    throw RepositoryException("amount_out_of_range", message)
 
 internal fun demoCompare(cars: List<Car>): Comparison {
     val summaries = cars.map(::demoSummary)
@@ -46,7 +61,7 @@ internal fun demoCompare(cars: List<Car>): Comparison {
         if (summaries.any { it.assessmentStatus == AssessmentStatus.INCOMPLETE }) {
             add(ComparisonWarning("incomplete", "Часть оценок ещё не завершена"))
         }
-        if (minimum < BigInteger.ZERO) {
+        if (minimum < 0L) {
             add(ComparisonWarning(
                 "negative_adjusted_cost",
                 "Скорректированная стоимость отрицательна. Проверьте оценку преимуществ"

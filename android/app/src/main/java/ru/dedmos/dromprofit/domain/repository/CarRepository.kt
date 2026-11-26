@@ -33,11 +33,11 @@ interface CarRepository {
     ): Car
     suspend fun deleteCar(carId: String)
 
-    suspend fun saveExpense(carId: String, input: ExpenseInput, expenseId: String? = null): Expense
+    suspend fun saveExpense(carId: String, input: ExpenseInput, original: Expense? = null): Expense
     suspend fun deleteExpense(carId: String, expenseId: String)
-    suspend fun saveBenefit(carId: String, input: BenefitInput, benefitId: String? = null): Benefit
+    suspend fun saveBenefit(carId: String, input: BenefitInput, original: Benefit? = null): Benefit
     suspend fun deleteBenefit(carId: String, benefitId: String)
-    suspend fun saveNote(carId: String, input: NoteInput, noteId: String? = null): Note
+    suspend fun saveNote(carId: String, input: NoteInput, original: Note? = null): Note
     suspend fun deleteNote(carId: String, noteId: String)
 
     suspend fun getSummary(carId: String): Summary

@@ -1,16 +1,14 @@
 package ru.dedmos.dromprofit.domain
 
-import java.math.BigInteger
-
 enum class AssessmentStatus { COMPLETE, INCOMPLETE }
 
 data class Summary(
     val carId: String,
     val listingPrice: Long,
-    val totalExpenses: BigInteger,
-    val totalBenefits: BigInteger,
-    val acquisitionCost: BigInteger,
-    val adjustedCost: BigInteger,
+    val totalExpenses: Long,
+    val totalBenefits: Long,
+    val acquisitionCost: Long,
+    val adjustedCost: Long,
     val assessmentStatus: AssessmentStatus,
     val unknownExpenses: Int,
     val unknownBenefits: Int
@@ -22,7 +20,7 @@ data class Comparison(
     val provisional: Boolean
 )
 
-data class ComparisonItem(val summary: Summary, val differenceFromMin: BigInteger?)
+data class ComparisonItem(val summary: Summary, val differenceFromMin: Long?)
 
 data class ComparisonWarning(
     val code: String,

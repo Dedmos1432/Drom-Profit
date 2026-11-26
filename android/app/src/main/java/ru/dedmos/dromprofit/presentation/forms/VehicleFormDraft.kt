@@ -5,6 +5,9 @@ import java.net.URI
 import ru.dedmos.dromprofit.domain.CarInput
 import ru.dedmos.dromprofit.domain.CarSource
 import ru.dedmos.dromprofit.domain.ListingData
+import ru.dedmos.dromprofit.domain.MaxCarPhotos
+import ru.dedmos.dromprofit.domain.MaxMoney
+import ru.dedmos.dromprofit.domain.photosWithCover
 
 internal enum class CarFieldInput { TEXT, INTEGER, DECIMAL, URI }
 
@@ -25,7 +28,7 @@ internal enum class CarField(
     ENGINE_POWER("Мощность, л. с.", CarFieldInput.INTEGER),
     TRANSMISSION("Коробка передач"),
     DRIVE("Привод"),
-    IMAGE_URL("Адрес фотографии", CarFieldInput.URI),
+    IMAGE_URL("Адрес основного снимка", CarFieldInput.URI),
     LISTING_URL("Оригинальное объявление", CarFieldInput.URI),
     MARKET_PRICE("Рыночная оценка Дрома, ₽", CarFieldInput.INTEGER),
 }
@@ -34,19 +37,25 @@ private val digits = Regex("[0-9]+")
 private val groupedDigits = Regex("[0-9]{1,3}(?:[ \u00A0\u202F][0-9]{3})+")
 private val decimalNumber = Regex("(?:[0-9]+(?:[,.][0-9]+)?|[,.][0-9]+)")
 
-internal fun List<String>.validationErrors(initial: ListingData?): Map<CarField, String> = buildMap {
+internal fun List<String>.validationErrors(initial: ListingData?, clearPhotos: Boolean = false): Map<CarField, String> = buildMap {
     CarField.entries.forEach { field ->
         val rawValue = this@validationErrors[field.ordinal]
         val value = rawValue.trim()
         val error = when {
+            field == CarField.IMAGE_URL && clearPhotos -> null
             value.isEmpty() && !field.required -> null
             field == CarField.BRAND && value.isEmpty() -> "Укажите марку."
             field == CarField.MODEL && value.isEmpty() -> "Укажите модель."
-            field == CarField.PRICE && (value.asInteger() ?: 0) < 1 -> "Укажите цену целым числом больше нуля."
+            (field == CarField.PRICE || field == CarField.MARKET_PRICE) &&
+                (value.asInteger() ?: 0L) !in 1L..MaxMoney -> "Укажите целое число от 1 до 1 000 000 000 000 ₽."
             field == CarField.YEAR && (value.asInteger() ?: 0) < 1886 -> "Укажите год не раньше 1886."
             field.input == CarFieldInput.INTEGER && value.asInteger() == null -> "Укажите целое число не меньше нуля."
             field == CarField.ENGINE_VOLUME && value.asEngineVolume() == null -> "Укажите число не меньше нуля."
-            field.input == CarFieldInput.URI && rawValue != initial.initialValue(field) && !value.isAbsoluteUri() ->
+            field == CarField.IMAGE_URL && initial?.imageUrls?.size == MaxCarPhotos &&
+                value !in initial.imageUrls -> "В галерее может быть до 64 фотографий."
+            field.input == CarFieldInput.URI &&
+                !(field == CarField.IMAGE_URL && value in initial?.imageUrls.orEmpty()) &&
+                rawValue != initial.initialValue(field) && !value.isAbsoluteUri() ->
                 "Укажите полный адрес."
             else -> null
         }
@@ -54,7 +63,7 @@ internal fun List<String>.validationErrors(initial: ListingData?): Map<CarField,
     }
 }
 
-internal fun List<String>.toCarInput(initial: ListingData?): CarInput {
+internal fun List<String>.toCarInput(initial: ListingData?, clearPhotos: Boolean = false): CarInput {
     fun text(field: CarField): String? {
         val value = this[field.ordinal]
         val original = initial.initialValue(field)
@@ -63,6 +72,11 @@ internal fun List<String>.toCarInput(initial: ListingData?): CarInput {
 
     fun integer(field: CarField): Long? = text(field)?.trim()?.asInteger()
 
+    val photos = if (clearPhotos) {
+        emptyList()
+    } else {
+        photosWithCover(initial?.imageUrls.orEmpty(), text(CarField.IMAGE_URL) ?: initial?.imageUrl)
+    }
     return CarInput(
         source = initial?.source ?: CarSource.MANUAL,
         listingId = initial?.listingId,
@@ -83,7 +97,8 @@ internal fun List<String>.toCarInput(initial: ListingData?): CarInput {
         enginePower = integer(CarField.ENGINE_POWER),
         transmission = text(CarField.TRANSMISSION),
         driveType = text(CarField.DRIVE),
-        imageUrl = text(CarField.IMAGE_URL),
+        imageUrl = photos.firstOrNull(),
+        imageUrls = photos,
         sourceUrl = text(CarField.LISTING_URL),
         marketPrice = integer(CarField.MARKET_PRICE),
     )
@@ -109,6 +124,8 @@ internal fun ListingData?.initialValue(field: CarField): String? {
         CarField.MARKET_PRICE -> marketPrice?.toString()
     }
 }
+
+internal fun String.asRubles(): Long? = if (this == "-0") 0L else asInteger()
 
 private fun String.asInteger(): Long? = when {
     matches(digits) -> toLongOrNull()

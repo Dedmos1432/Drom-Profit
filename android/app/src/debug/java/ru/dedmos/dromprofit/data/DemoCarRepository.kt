@@ -3,6 +3,7 @@ package ru.dedmos.dromprofit.data
 import android.content.Context
 import android.database.sqlite.SQLiteException
 import android.util.AtomicFile
+import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParseException
 import com.google.gson.JsonParser
@@ -26,10 +27,14 @@ import ru.dedmos.dromprofit.domain.Expense
 import ru.dedmos.dromprofit.domain.ExpenseInput
 import ru.dedmos.dromprofit.domain.ExpenseKind
 import ru.dedmos.dromprofit.domain.ListingData
+import ru.dedmos.dromprofit.domain.MaxCarPhotos
+import ru.dedmos.dromprofit.domain.MaxMoney
 import ru.dedmos.dromprofit.domain.Note
 import ru.dedmos.dromprofit.domain.NoteInput
 import ru.dedmos.dromprofit.domain.repository.RepositoryException
 import ru.dedmos.dromprofit.domain.Summary
+import ru.dedmos.dromprofit.domain.photosWithCover
+import ru.dedmos.dromprofit.domain.toInput
 import ru.dedmos.dromprofit.domain.toListingData
 import java.io.File
 import java.io.IOException
@@ -65,11 +70,15 @@ internal class DemoCarRepository(
     private val mutex = Mutex()
     private var failNextList = scenario == DemoScenario.ListError
 
-    private val showcaseCars by lazy { assetObjects("showcase-cars.json").map(JsonObject::readCar) }
+    private val showcaseListings by lazy { assetObjects("demo-showcase.json") }
+    private val showcaseCars by lazy {
+        val assessments = JsonParser.parseString(assetText("demo-showcase-assessments.json")).asJsonObject
+        demoShowcaseCars(showcaseListings, assessments)
+    }
 
     private val listings by lazy {
-        (assetObjects("import-listings.json").map(JsonObject::readListing) + showcaseCars.map(Car::toListingData))
-            .associateBy { it.sourceUrl }
+        (assetObjects("import-listings.json") + showcaseListings)
+            .map(JsonObject::readListing).associateBy { it.sourceUrl }
     }
 
     override suspend fun restartSession() {
@@ -122,12 +131,25 @@ internal class DemoCarRepository(
         input.validate()
         val changes = input.changesFrom(original)
         val json = car.toListingData().toCarInput().toJson()
-        if (changes.entrySet().none { (key, value) -> json.get(key) != value }) {
-            return@updateCar car
-        }
-        changes.entrySet().forEach { (key, value) -> json.add(key, value) }
-        json.readListing().toCarInput().toCar(
+        if (changes.entrySet().none { (key, value) -> json.get(key) != value }) return@updateCar car
+
+        val listing = json.applyChanges(changes).apply {
+            if (changes.has("image_url") || changes.has("image_urls")) {
+                val photos = if (changes.has("image_urls")) {
+                    changes.getAsJsonArray("image_urls").map { it.asString }.distinct()
+                } else {
+                    photosWithCover(car.imageUrls, changes.stringOrNull("image_url"))
+                }
+                if (photos.size > MaxCarPhotos) validationError()
+                add("image_urls", JsonArray().apply { photos.forEach { add(it) } })
+                addProperty("image_url", photos.firstOrNull())
+            }
+        }.readListing()
+        val characteristicsChanged = changes.keySet().any { it != "image_url" && it != "image_urls" }
+        listing.toCarInput().toCar(
             id = car.id,
+            expensesReviewed = car.expensesReviewed && !characteristicsChanged,
+            benefitsReviewed = car.benefitsReviewed && !characteristicsChanged,
             expenses = car.expenses,
             benefits = car.benefits,
             notes = car.notes
@@ -149,14 +171,25 @@ internal class DemoCarRepository(
         if (cars.deleteCar(scope, carId) == 0) notFound()
     }
 
-    override suspend fun saveExpense(carId: String, input: ExpenseInput, expenseId: String?): Expense {
+    override suspend fun saveExpense(carId: String, input: ExpenseInput, original: Expense?): Expense {
         validateMoneyFactor(input.title, input.amount)
-        val expense = Expense(expenseId ?: newId(), input.title, input.kind, input.amount, input.factorKey, input.comment)
-        updateCar(carId) { car ->
-            val updated = car.expenses.saveRecord(expense, expenseId == null, Expense::id)
-            if (updated == car.expenses) car else car.copy(expenses = updated, expensesReviewed = false).validateFactors()
+        val id = original?.id ?: newId()
+        val changes = input.toJson()
+        if (original != null && changes.keepChangesFrom(original.toInput().toJson()).size() == 0) {
+            return original
         }
-        return expense
+        val saved = updateCar(carId) { car ->
+            val value = if (original == null) changes else {
+                val current = car.expenses.firstOrNull { it.id == id } ?: notFound()
+                current.toInput().toJson().applyChanges(changes)
+            }
+            val record = value.apply { addProperty("id", id) }.readExpense()
+            val updated = car.expenses.saveRecord(record, original == null, Expense::id)
+            if (updated == car.expenses) return@updateCar car
+            demoGroupTotal(updated.map(Expense::amount))
+            car.copy(expenses = updated, expensesReviewed = false).validateFactors()
+        }
+        return saved.expenses.first { it.id == id }
     }
 
     override suspend fun deleteExpense(carId: String, expenseId: String) {
@@ -165,14 +198,25 @@ internal class DemoCarRepository(
         }
     }
 
-    override suspend fun saveBenefit(carId: String, input: BenefitInput, benefitId: String?): Benefit {
+    override suspend fun saveBenefit(carId: String, input: BenefitInput, original: Benefit?): Benefit {
         validateMoneyFactor(input.title, input.amount)
-        val benefit = Benefit(benefitId ?: newId(), input.title, input.amount, input.factorKey, input.comment)
-        updateCar(carId) { car ->
-            val updated = car.benefits.saveRecord(benefit, benefitId == null, Benefit::id)
-            if (updated == car.benefits) car else car.copy(benefits = updated, benefitsReviewed = false).validateFactors()
+        val id = original?.id ?: newId()
+        val changes = input.toJson()
+        if (original != null && changes.keepChangesFrom(original.toInput().toJson()).size() == 0) {
+            return original
         }
-        return benefit
+        val saved = updateCar(carId) { car ->
+            val value = if (original == null) changes else {
+                val current = car.benefits.firstOrNull { it.id == id } ?: notFound()
+                current.toInput().toJson().applyChanges(changes)
+            }
+            val record = value.apply { addProperty("id", id) }.readBenefit()
+            val updated = car.benefits.saveRecord(record, original == null, Benefit::id)
+            if (updated == car.benefits) return@updateCar car
+            demoGroupTotal(updated.map(Benefit::amount))
+            car.copy(benefits = updated, benefitsReviewed = false).validateFactors()
+        }
+        return saved.benefits.first { it.id == id }
     }
 
     override suspend fun deleteBenefit(carId: String, benefitId: String) {
@@ -181,11 +225,23 @@ internal class DemoCarRepository(
         }
     }
 
-    override suspend fun saveNote(carId: String, input: NoteInput, noteId: String?): Note {
+    override suspend fun saveNote(carId: String, input: NoteInput, original: Note?): Note {
         if (input.text.isBlank()) validationError()
-        val note = Note(noteId ?: newId(), input.kind, input.text)
-        updateCar(carId) { car -> car.copy(notes = car.notes.saveRecord(note, noteId == null, Note::id)) }
-        return note
+        val id = original?.id ?: newId()
+        val changes = input.toJson()
+        if (original != null && changes.keepChangesFrom(original.toInput().toJson()).size() == 0) {
+            return original
+        }
+        val saved = updateCar(carId) { car ->
+            val value = if (original == null) changes else {
+                val current = car.notes.firstOrNull { it.id == id } ?: notFound()
+                current.toInput().toJson().applyChanges(changes)
+            }
+            val record = value.apply { addProperty("id", id) }.readNote()
+            val updated = car.notes.saveRecord(record, original == null, Note::id)
+            car.copy(notes = updated)
+        }
+        return saved.notes.first { it.id == id }
     }
 
     override suspend fun deleteNote(carId: String, noteId: String) {
@@ -253,7 +309,8 @@ internal class DemoCarRepository(
             else -> null
         }
         if (car.imageUrl == null && modelPhoto != null) {
-            car.copy(imageUrl = "file:///android_asset/demo/vehicles/" + modelPhoto)
+            val path = "/$DemoPhotoDirectory/$modelPhoto"
+            car.copy(imageUrl = path, imageUrls = listOf(path))
         } else car
     }
 
@@ -261,8 +318,10 @@ internal class DemoCarRepository(
         car.toEntity(scope, index.toLong())
     }
 
-    private fun assetObjects(name: String): List<JsonObject> =
-        assets.open(name).bufferedReader(Charsets.UTF_8).use { parseObjects(it.readText()) }
+    private fun assetObjects(name: String): List<JsonObject> = parseObjects(assetText(name))
+
+    private fun assetText(name: String): String =
+        assets.open(name).bufferedReader(Charsets.UTF_8).use { it.readText() }
 
     private fun parseObjects(text: String): List<JsonObject> =
         JsonParser.parseString(text).asJsonArray.map { it.asJsonObject }
@@ -295,16 +354,26 @@ private fun Car.validateFactors(): Car {
 
 private fun CarInput.validate() {
     val validEngineVolume = engineVolume?.let { it.isFinite() && it >= 0 } ?: true
-    val validUrls = listOfNotNull(sourceUrl, imageUrl).all { url ->
-        runCatching { URI(url).isAbsolute }.getOrDefault(false)
-    }
-    if (brand.isBlank() || model.isBlank() || price <= 0 || (year != null && year < 1886) ||
-        listOfNotNull(mileage, enginePower, marketPrice).any { it < 0 } || !validEngineVolume || !validUrls
+    val gallery = imageUrls ?: listOfNotNull(imageUrl)
+    val validPhotos = gallery.size <= MaxCarPhotos && (imageUrl == null || gallery.firstOrNull() == imageUrl) &&
+        gallery.all { parseDemoPhoto(it) != null || it.isAbsoluteUri() }
+    if (brand.isBlank() || model.isBlank() || (year != null && year < 1886) ||
+        listOfNotNull(mileage, enginePower).any { it < 0 } || !validEngineVolume ||
+        !validPhotos || sourceUrl?.isAbsoluteUri() == false
     ) validationError()
+    if (price !in 1L..MaxMoney || (marketPrice != null && marketPrice !in 1L..MaxMoney)) {
+        demoAmountOutOfRange("Цена и указанная рыночная оценка должны быть от 1 до 1 000 000 000 000 ₽.")
+    }
 }
 
+private fun String.isAbsoluteUri(): Boolean =
+    runCatching { URI(this).isAbsolute }.getOrDefault(false)
+
 private fun validateMoneyFactor(title: String, amount: Long?) {
-    if (title.isBlank() || (amount != null && amount < 0)) validationError()
+    if (title.isBlank()) validationError()
+    if (amount != null && amount !in 0L..MaxMoney) {
+        demoAmountOutOfRange("Сумма должна быть от 0 до 1 000 000 000 000 ₽.")
+    }
 }
 
 private fun notFound(): Nothing = throw RepositoryException("not_found", "Запись не найдена.")

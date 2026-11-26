@@ -13,7 +13,7 @@ import ru.dedmos.dromprofit.domain.CarSource
 import ru.dedmos.dromprofit.domain.ExpenseInput
 import ru.dedmos.dromprofit.domain.NoteInput
 
-internal fun Car.toEntity(scope: String, position: Long = 0): CarEntity = CarEntity(
+internal fun Car.toEntity(scope: String, position: Long = 0, hasGallery: Boolean = true): CarEntity = CarEntity(
     scope = scope,
     id = id,
     position = position,
@@ -31,6 +31,7 @@ internal fun Car.toEntity(scope: String, position: Long = 0): CarEntity = CarEnt
     driveType = driveType,
     city = city,
     imageUrl = imageUrl,
+    imageUrlsJson = if (hasGallery) JsonArray().apply { imageUrls.forEach { add(it) } }.toString() else null,
     sourceUrl = sourceUrl,
     marketPrice = marketPrice,
     listingId = listingId,
@@ -67,6 +68,8 @@ internal fun CarEntity.toDomain(): Car = Car(
     engineVolume = engineVolume,
     transmission = transmission,
     imageUrl = imageUrl,
+    imageUrls = imageUrlsJson?.let { JsonParser.parseString(it).asJsonArray.map { url -> url.asString } }
+        ?: listOfNotNull(imageUrl),
     trim = trim,
     engineType = engineType,
     enginePower = enginePower,

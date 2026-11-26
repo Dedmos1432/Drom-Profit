@@ -18,7 +18,9 @@ import java.io.File
 internal fun createNetworkRepository(context: Context, cars: CarDao): CarRepository {
     val configuredUrl = BuildConfig.DROM_PROFIT_API_BASE_URL
     val baseUrl = (configuredUrl.trimEnd('/') + "/").toHttpUrlOrNull()
-    if (baseUrl == null || (!BuildConfig.DEBUG && !baseUrl.isHttps)) {
+    if (baseUrl == null ||
+        (!baseUrl.isHttps && (!BuildConfig.DEBUG || baseUrl.host !in setOf("10.0.2.2", "127.0.0.1")))
+    ) {
         return NetworkCarRepository(api = null, tokenFile = null)
     }
 

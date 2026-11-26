@@ -6,12 +6,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -52,7 +50,7 @@ import ru.dedmos.dromprofit.presentation.components.ProfitScaffold
 import ru.dedmos.dromprofit.presentation.components.ProfitScreenColumn
 import ru.dedmos.dromprofit.presentation.components.SecondaryAction
 import ru.dedmos.dromprofit.presentation.components.StatusLabel
-import ru.dedmos.dromprofit.presentation.components.VehiclePhoto
+import ru.dedmos.dromprofit.presentation.components.VehicleGallery
 import ru.dedmos.dromprofit.presentation.components.isDemoModelPhoto
 import ru.dedmos.dromprofit.presentation.ui.theme.DromProfitTheme
 import ru.dedmos.dromprofit.presentation.viewmodels.CarFormUiState
@@ -303,13 +301,7 @@ private fun ListingPreview(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
         )
-        listing.imageUrl?.let { imageUrl ->
-            VehiclePhoto(
-                imageUrl = imageUrl,
-                modifier = Modifier.width(160.dp).aspectRatio(4f / 3f),
-                contentDescription = "Фотография автомобиля",
-            )
-        }
+        VehicleGallery(imageUrls = listing.imageUrls, contentDescription = "Предпросмотр автомобиля")
         VehicleForm(
             initial = listing,
             submitLabel = "Сохранить автомобиль",

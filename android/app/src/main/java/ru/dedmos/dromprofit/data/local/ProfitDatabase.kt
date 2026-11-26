@@ -9,6 +9,8 @@ import androidx.room.Query
 import androidx.room.RoomDatabase
 import androidx.room.Transaction
 import androidx.room.Upsert
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Entity(tableName = "cars", primaryKeys = ["scope", "id"])
 internal data class CarEntity(
@@ -37,7 +39,8 @@ internal data class CarEntity(
     val benefitsReviewed: Boolean,
     val expensesJson: String,
     val benefitsJson: String,
-    val notesJson: String
+    val notesJson: String,
+    val imageUrlsJson: String?
 )
 
 @Entity(tableName = "demo_selections")
@@ -84,8 +87,9 @@ internal abstract class CarDao {
 
     @Transaction
     open suspend fun saveCar(car: CarEntity): CarEntity {
-        val position = this.car(car.scope, car.id)?.position ?: (lastPosition(car.scope) ?: -1L) + 1
-        upsert(car.copy(position = position))
+        val previous = this.car(car.scope, car.id)
+        val position = previous?.position ?: (lastPosition(car.scope) ?: -1L) + 1
+        upsert(car.withRememberedGallery(previous).copy(position = position))
         return requireNotNull(this.car(car.scope, car.id))
     }
 
@@ -98,8 +102,9 @@ internal abstract class CarDao {
 
     @Transaction
     open suspend fun replaceSelection(scope: String, cars: List<CarEntity>): List<CarEntity> {
+        val previous = selection(scope).associateBy(CarEntity::id)
         clearSelection(scope)
-        upsertAll(cars)
+        upsertAll(cars.map { it.withRememberedGallery(previous[it.id]) })
         return selection(scope)
     }
 
@@ -112,7 +117,19 @@ internal abstract class CarDao {
     }
 }
 
-@Database(entities = [CarEntity::class, DemoSelectionEntity::class], version = 1, exportSchema = false)
+@Database(entities = [CarEntity::class, DemoSelectionEntity::class], version = 2, exportSchema = false)
 internal abstract class ProfitDatabase : RoomDatabase() {
     abstract fun carDao(): CarDao
+}
+
+internal val ProfitDatabaseMigration1To2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE cars ADD COLUMN imageUrlsJson TEXT")
+    }
+}
+
+// A short server response carries only the cover. Keep a matching cached gallery.
+private fun CarEntity.withRememberedGallery(previous: CarEntity?): CarEntity {
+    if (imageUrlsJson != null || imageUrl != previous?.imageUrl) return this
+    return copy(imageUrlsJson = previous?.imageUrlsJson)
 }

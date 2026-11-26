@@ -56,6 +56,21 @@ npm.cmd run dev -- --host localhost --port 5173 --strictPort
 
 Для показа пяти заполненных карточек используйте проект `drom-mvp-demo`, отдельный профиль Chrome и локальную страницу подготовки в режиме real. Серверный Demo Provider получает пять дополнительных ссылок `101–105` через `DROM_LISTINGS_EXTRA_FIXTURE`. [Команды запуска, сценарии и контрольные суммы](DEMO_SHOWCASE.md)
 
+## Терминал 3. Android
+
+Для Android нужны JDK 21, Android SDK Platform 37, Build Tools 36.0.0 и Platform Tools. API для real-режима предоставляет Терминал 1. Для прогона на отдельной PostgreSQL с пятью автомобилями включите Demo Provider с `DROM_LISTINGS_EXTRA_FIXTURE=/srv/shared/fixtures/demo-showcase.json` по [инструкции Android](ANDROID_INTEGRATION.md#локальный-стенд-и-сборка). У каждого клиента своя анонимная сессия.
+
+В PowerShell из каталога `android` и при запущенном эмуляторе:
+
+```powershell
+.\gradlew.bat :app:assembleDebug '-PdromProfitApiBaseUrl=http://10.0.2.2:8000/'
+adb install -r 'app\build\outputs\apk\debug\app-debug.apk'
+adb shell am start -n 'ru.dedmos.dromprofit/.presentation.MainActivity'
+.\gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:connectedDebugAndroidTest '-PdromProfitApiBaseUrl=http://10.0.2.2:8000/'
+```
+
+Для телефона по USB выполните `adb reverse tcp:8000 tcp:8000` и замените адрес в параметре Gradle на `http://127.0.0.1:8000/`. Для автономной витрины соберите debug с `-PdromProfitDemoScenario=showcase` и без параметра API. Фото `/demo/vehicles/…` берутся из Android debug assets. В real вручную импортируйте ссылки `101–105`, сохраните каждую карточку и проверьте три кадра, правку города, расходы, преимущества, заметки и сравнение двух и пяти машин. [Оценки и контрольные результаты витрины](DEMO_SHOWCASE.md)
+
 ## Типовые ошибки
 
 | Симптом | Что проверить |
