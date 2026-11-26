@@ -1,0 +1,279 @@
+[
+  {
+    "id": "showcase-101",
+    "source": "demo",
+    "listing_url": "https://auto.drom.ru/demo/101.html",
+    "image_url": "file:///android_asset/demo/vehicles/camry-xv50-silver.jpg?gallery=101",
+    "fuel_type": "Бензин",
+    "market_valuation": null,
+    "fetched_at": null,
+    "expenses_reviewed": true,
+    "benefits_reviewed": true,
+    "listing_id": "101",
+    "brand": "Toyota",
+    "model": "Camry",
+    "year": 2015,
+    "price": 1200000,
+    "mileage_km": 145000,
+    "engine_volume_l": 2.5,
+    "power_hp": 181,
+    "transmission": "Автомат",
+    "drive_type": "Передний",
+    "trim": "Элеганс",
+    "city": "Владивосток",
+    "expenses": [
+      {
+        "id": "brake-pads",
+        "kind": "repair",
+        "title": "Замена передних колодок",
+        "amount": 18000,
+        "comment": null,
+        "factor_key": null
+      },
+      {
+        "id": "service",
+        "kind": "maintenance",
+        "title": "Замена масла и фильтров",
+        "amount": 15000,
+        "comment": null,
+        "factor_key": null
+      }
+    ],
+    "benefits": [
+      {
+        "id": "tires",
+        "title": "Комплект зимних шин",
+        "amount": 25000,
+        "comment": null,
+        "factor_key": null
+      }
+    ],
+    "notes": [
+      {
+        "id": "road-test",
+        "kind": "inspection",
+        "text": "Проверить работу кондиционера на пробной поездке."
+      }
+    ]
+  },
+  {
+    "id": "showcase-102",
+    "source": "demo",
+    "listing_url": "https://auto.drom.ru/demo/102.html",
+    "image_url": "file:///android_asset/demo/vehicles/accord-ix.jpg?gallery=102",
+    "fuel_type": "Бензин",
+    "market_valuation": null,
+    "fetched_at": null,
+    "expenses_reviewed": true,
+    "benefits_reviewed": true,
+    "listing_id": "102",
+    "brand": "Honda",
+    "model": "Accord",
+    "year": 2016,
+    "price": 1350000,
+    "mileage_km": 130000,
+    "engine_volume_l": 3.5,
+    "power_hp": 278,
+    "transmission": "Автомат",
+    "drive_type": "Передний",
+    "trim": "Touring",
+    "city": "Хабаровск",
+    "expenses": [
+      {
+        "id": "suspension",
+        "kind": "repair",
+        "title": "Устранение стука в подвеске",
+        "amount": null,
+        "comment": null,
+        "factor_key": null
+      },
+      {
+        "id": "transmission-service",
+        "kind": "maintenance",
+        "title": "Замена масла в коробке передач",
+        "amount": 17000,
+        "comment": null,
+        "factor_key": null
+      }
+    ],
+    "benefits": [
+      {
+        "id": "camera",
+        "title": "Камера заднего вида",
+        "amount": 12000,
+        "comment": null,
+        "factor_key": null
+      }
+    ],
+    "notes": [
+      {
+        "id": "quote",
+        "kind": "inspection",
+        "text": "Получить смету ремонта подвески после диагностики."
+      }
+    ]
+  },
+  {
+    "id": "showcase-103",
+    "source": "demo",
+    "listing_url": "https://auto.drom.ru/demo/103.html",
+    "image_url": "file:///android_asset/demo/vehicles/mazda6-gj.jpg?gallery=103",
+    "fuel_type": "Бензин",
+    "market_valuation": null,
+    "fetched_at": null,
+    "expenses_reviewed": true,
+    "benefits_reviewed": true,
+    "listing_id": "103",
+    "brand": "Mazda",
+    "model": "6",
+    "year": 2017,
+    "price": 1450000,
+    "mileage_km": 112000,
+    "engine_volume_l": 2,
+    "power_hp": 150,
+    "transmission": "Автомат",
+    "drive_type": "Передний",
+    "trim": "Active",
+    "city": "Красноярск",
+    "expenses": [
+      {
+        "id": "alignment",
+        "kind": "maintenance",
+        "title": "Проверка и регулировка сход-развала",
+        "amount": 5000,
+        "comment": null,
+        "factor_key": null
+      }
+    ],
+    "benefits": [
+      {
+        "id": "parking",
+        "title": "Передние и задние парктроники",
+        "amount": 15000,
+        "comment": null,
+        "factor_key": null
+      }
+    ],
+    "notes": [
+      {
+        "id": "scratch",
+        "kind": "accepted_defect",
+        "text": "Небольшая царапина на заднем бампере, ремонт не планируется."
+      }
+    ]
+  },
+  {
+    "id": "showcase-104",
+    "source": "demo",
+    "listing_url": "https://auto.drom.ru/demo/104.html",
+    "image_url": "file:///android_asset/demo/vehicles/x-trail-t32.jpg?gallery=104",
+    "fuel_type": "Бензин",
+    "market_valuation": null,
+    "fetched_at": null,
+    "expenses_reviewed": true,
+    "benefits_reviewed": false,
+    "listing_id": "104",
+    "brand": "Nissan",
+    "model": "X-Trail",
+    "year": 2015,
+    "price": 1550000,
+    "mileage_km": 160000,
+    "engine_volume_l": 2,
+    "power_hp": 144,
+    "transmission": "Вариатор",
+    "drive_type": "Полный",
+    "trim": "SE",
+    "city": "Иркутск",
+    "expenses": [
+      {
+        "id": "battery",
+        "kind": "maintenance",
+        "title": "Новый аккумулятор",
+        "amount": 12000,
+        "comment": null,
+        "factor_key": null
+      },
+      {
+        "id": "undertray",
+        "kind": "missing_equipment",
+        "title": "Защита двигателя",
+        "amount": 9000,
+        "comment": null,
+        "factor_key": null
+      }
+    ],
+    "benefits": [
+      {
+        "id": "remote-start",
+        "title": "Дистанционный запуск двигателя",
+        "amount": 10000,
+        "comment": null,
+        "factor_key": null
+      }
+    ],
+    "notes": [
+      {
+        "id": "keys",
+        "kind": "seller",
+        "text": "Продавец обещал привезти второй ключ к осмотру."
+      }
+    ]
+  },
+  {
+    "id": "showcase-105",
+    "source": "demo",
+    "listing_url": "https://auto.drom.ru/demo/105.html",
+    "image_url": "file:///android_asset/demo/vehicles/rav4-xa40.jpg?gallery=105",
+    "fuel_type": "Бензин",
+    "market_valuation": null,
+    "fetched_at": null,
+    "expenses_reviewed": true,
+    "benefits_reviewed": true,
+    "listing_id": "105",
+    "brand": "Toyota",
+    "model": "RAV4",
+    "year": 2016,
+    "price": 1850000,
+    "mileage_km": 98000,
+    "engine_volume_l": 2,
+    "power_hp": 146,
+    "transmission": "Вариатор",
+    "drive_type": "Полный",
+    "trim": "Комфорт",
+    "city": "Новосибирск",
+    "expenses": [
+      {
+        "id": "coolant",
+        "kind": "maintenance",
+        "title": "Плановая замена охлаждающей жидкости",
+        "amount": 13000,
+        "comment": null,
+        "factor_key": null
+      },
+      {
+        "id": "registration",
+        "kind": "other",
+        "title": "Постановка на учёт и комплект номеров",
+        "amount": 4000,
+        "comment": null,
+        "factor_key": null
+      }
+    ],
+    "benefits": [
+      {
+        "id": "extra-wheels",
+        "title": "Дополнительный комплект дисков",
+        "amount": 28000,
+        "comment": null,
+        "factor_key": null
+      }
+    ],
+    "notes": [
+      {
+        "id": "maintenance-record",
+        "kind": "report",
+        "text": "Записаны даты последних плановых обслуживаний."
+      }
+    ]
+  }
+]
