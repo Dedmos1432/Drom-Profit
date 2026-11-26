@@ -69,6 +69,8 @@ class DromHtmlProvider:
 
     async def fetch(self, url: str) -> ListingData:
         target = validate_listing_url(url, self.allowed_hosts)
+        if target.path.startswith("/demo/"):
+            raise ListingImportError("listing_unavailable", "ссылка демонстрационного источника")
         deadline = time.monotonic() + self._limits.total_timeout
         try:
             await asyncio.wait_for(self._semaphore.acquire(), timeout=self._limits.total_timeout)

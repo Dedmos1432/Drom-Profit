@@ -32,11 +32,16 @@ class FixtureListingProvider:
             self._by_url[key] = listing
 
     @classmethod
-    def from_file(cls, path: Path) -> "FixtureListingProvider":
-        rows = json.loads(Path(path).read_text("utf-8"))
-        if not isinstance(rows, list):
-            raise ValueError("Ожидается JSON-массив ListingData")
-        return cls([ListingData.from_dict(row) for row in rows])
+    def from_file(cls, path: Path, *additional_paths: Path) -> "FixtureListingProvider":
+        listings = []
+        for fixture in (path, *additional_paths):
+            rows = json.loads(Path(fixture).read_text("utf-8"))
+            if not isinstance(rows, list):
+                raise ValueError("Ожидается JSON-массив ListingData")
+            if not rows:
+                raise ValueError("Демонстрационный набор объявлений пуст")
+            listings.extend(ListingData.from_dict(row) for row in rows)
+        return cls(listings)
 
     async def fetch(self, url: str) -> ListingData:
         canonical = validate_listing_url(url, self.allowed_hosts).canonical

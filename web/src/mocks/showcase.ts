@@ -1,31 +1,9 @@
-import demoListings from '../../../shared/fixtures/import-listings.json';
+import showcaseListings from '../../../shared/fixtures/demo-showcase.json';
 import type { Car, CarDetail, Listing } from '@/entities/vehicle/api';
 import type { Benefit, Expense } from '@/entities/vehicle/records';
 
-const showcasePhotos = {
-  '102': ['accord-ix.jpg', 'accord-ix-front.jpg', 'accord-ix-side.jpg'],
-  '103': ['mazda6-gj.jpg', 'mazda6-gj-rear.jpg', 'mazda6-gj-white.jpg'],
-  '104': ['x-trail-t32.jpg', 'x-trail-t32-rear.jpg', 'x-trail-t32-interior.jpg'],
-  '105': ['rav4-xa40.jpg', 'rav4-xa40-rear.jpg', 'rav4-xa40-interior.jpg'],
-} as const;
-
 type ShowcaseVehicle = {
-  listingId: '101' | keyof typeof showcasePhotos;
-  specs: Pick<
-    Car,
-    | 'brand'
-    | 'model'
-    | 'year'
-    | 'price'
-    | 'mileage_km'
-    | 'fuel_type'
-    | 'engine_volume_l'
-    | 'power_hp'
-    | 'transmission'
-    | 'drive_type'
-    | 'trim'
-    | 'city'
-  >;
+  listingId: string;
   assessment: Pick<
     Car,
     'expenses' | 'benefits' | 'notes' | 'expenses_reviewed' | 'benefits_reviewed'
@@ -43,20 +21,6 @@ function benefit(id: string, title: string, amount: number): Benefit {
 const showcase: readonly ShowcaseVehicle[] = [
   {
     listingId: '101',
-    specs: {
-      brand: 'Toyota',
-      model: 'Camry',
-      year: 2015,
-      price: 1_200_000,
-      mileage_km: 145_000,
-      fuel_type: 'Бензин',
-      engine_volume_l: 2.5,
-      power_hp: 181,
-      transmission: 'Автомат',
-      drive_type: 'Передний',
-      trim: 'Элеганс',
-      city: 'Владивосток',
-    },
     assessment: {
       expenses: [
         expense('brake-pads', 'repair', 'Замена передних колодок', 18_000),
@@ -76,20 +40,6 @@ const showcase: readonly ShowcaseVehicle[] = [
   },
   {
     listingId: '102',
-    specs: {
-      brand: 'Honda',
-      model: 'Accord',
-      year: 2016,
-      price: 1_350_000,
-      mileage_km: 130_000,
-      fuel_type: 'Бензин',
-      engine_volume_l: 3.5,
-      power_hp: 278,
-      transmission: 'Автомат',
-      drive_type: 'Передний',
-      trim: 'Touring',
-      city: 'Хабаровск',
-    },
     assessment: {
       expenses: [
         expense('suspension', 'repair', 'Устранение стука в подвеске', null),
@@ -109,20 +59,6 @@ const showcase: readonly ShowcaseVehicle[] = [
   },
   {
     listingId: '103',
-    specs: {
-      brand: 'Mazda',
-      model: '6',
-      year: 2017,
-      price: 1_450_000,
-      mileage_km: 112_000,
-      fuel_type: 'Бензин',
-      engine_volume_l: 2,
-      power_hp: 150,
-      transmission: 'Автомат',
-      drive_type: 'Передний',
-      trim: 'Active',
-      city: 'Красноярск',
-    },
     assessment: {
       expenses: [expense('alignment', 'maintenance', 'Проверка и регулировка сход-развала', 5_000)],
       benefits: [benefit('parking', 'Передние и задние парктроники', 15_000)],
@@ -139,20 +75,6 @@ const showcase: readonly ShowcaseVehicle[] = [
   },
   {
     listingId: '104',
-    specs: {
-      brand: 'Nissan',
-      model: 'X-Trail',
-      year: 2015,
-      price: 1_550_000,
-      mileage_km: 160_000,
-      fuel_type: 'Бензин',
-      engine_volume_l: 2,
-      power_hp: 144,
-      transmission: 'Вариатор',
-      drive_type: 'Полный',
-      trim: 'SE',
-      city: 'Иркутск',
-    },
     assessment: {
       expenses: [
         expense('battery', 'maintenance', 'Новый аккумулятор', 12_000),
@@ -168,20 +90,6 @@ const showcase: readonly ShowcaseVehicle[] = [
   },
   {
     listingId: '105',
-    specs: {
-      brand: 'Toyota',
-      model: 'RAV4',
-      year: 2016,
-      price: 1_850_000,
-      mileage_km: 98_000,
-      fuel_type: 'Бензин',
-      engine_volume_l: 2,
-      power_hp: 146,
-      transmission: 'Вариатор',
-      drive_type: 'Полный',
-      trim: 'Комфорт',
-      city: 'Новосибирск',
-    },
     assessment: {
       expenses: [
         expense('coolant', 'maintenance', 'Плановая замена охлаждающей жидкости', 13_000),
@@ -201,34 +109,19 @@ const showcase: readonly ShowcaseVehicle[] = [
   },
 ];
 
-const listingUrl = (id: string) => 'https://auto.drom.ru/demo/' + id + '.html';
-
-function listingData({ listingId, specs }: ShowcaseVehicle) {
-  const image_urls =
-    listingId === '101'
-      ? (demoListings.find(({ listing_id }) => listing_id === 'demo-001')?.image_urls ?? [])
-      : showcasePhotos[listingId].map((file) => '/demo/vehicles/' + file);
-  return {
-    ...specs,
-    source: 'demo',
-    listing_id: listingId,
-    listing_url: listingUrl(listingId),
-    image_url: image_urls[0] ?? null,
-    image_urls,
-    market_valuation: null,
-    fetched_at: null,
-  } satisfies Listing;
-}
+const listings = showcaseListings.map((listing) => ({
+  ...listing,
+  source: 'demo',
+})) satisfies Listing[];
 
 export function findShowcaseListing(url: string): Listing | undefined {
-  const vehicle = showcase.find(({ listingId }) => listingUrl(listingId) === url);
-  return vehicle && listingData(vehicle);
+  return listings.find(({ listing_url }) => listing_url === url);
 }
 
 export function showcaseCars(): CarDetail[] {
-  return showcase.map((vehicle) => ({
-    ...listingData(vehicle),
-    ...vehicle.assessment,
-    id: 'showcase-' + vehicle.listingId,
-  }));
+  return listings.map((listing) => {
+    const vehicle = showcase.find(({ listingId }) => listingId === listing.listing_id);
+    if (!vehicle) throw new Error('Missing Mock Showcase assessment');
+    return { ...listing, ...vehicle.assessment, id: 'showcase-' + vehicle.listingId };
+  });
 }

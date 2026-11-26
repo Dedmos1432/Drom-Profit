@@ -13,7 +13,7 @@ export type Comparison = Operation['responses'][200]['content']['application/jso
 export type ComparisonItem = Comparison['items'][number];
 export type ComparisonWarning = Comparison['warnings'][number];
 
-const comparisonSchema = z.object({
+export const comparisonSchema = z.object({
   items: z.array(summarySchema.extend({ difference_from_min: comparisonDifference.nullable() })),
   warnings: z.array(
     z.object({

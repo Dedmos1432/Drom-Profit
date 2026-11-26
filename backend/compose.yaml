@@ -19,6 +19,7 @@ x-app: &app
     DROM_DB_MAX_OVERFLOW: ${DROM_DB_MAX_OVERFLOW:-5}
     DROM_CORS_ORIGINS: ${DROM_CORS_ORIGINS:-}
     DROM_LISTINGS_SOURCE: ${DROM_LISTINGS_SOURCE:-demo}
+    DROM_LISTINGS_EXTRA_FIXTURE: ${DROM_LISTINGS_EXTRA_FIXTURE:-}
   volumes: &shared
     - type: bind
       source: ../shared

@@ -56,12 +56,15 @@ def make_importer(
     source: SourceMode = "demo",
     *,
     fixture_path: Path | None = None,
+    additional_fixture_paths: tuple[Path, ...] = (),
     drom_access_approved: bool = False,
     drom_hosts: HostAllowlist | None = None,
     drom_redirect_hosts: HostAllowlist | None = None,
 ) -> ListingImporter:
     if source == "demo":
-        return ListingImporter(FixtureListingProvider.from_file(fixture_path or DEFAULT_FIXTURE_PATH))
+        return ListingImporter(FixtureListingProvider.from_file(
+            fixture_path or DEFAULT_FIXTURE_PATH, *additional_fixture_paths,
+        ))
     if source == "drom":
         from .drom_provider import DromHtmlProvider
 
@@ -78,17 +81,23 @@ def importer_from_env(environ: Mapping[str, str] = os.environ) -> ListingImporte
 
     * ``DROM_LISTINGS_SOURCE`` — ``demo`` (по умолчанию) или ``drom``;
     * ``DROM_LISTINGS_FIXTURE`` — путь к JSON для demo;
+    * ``DROM_LISTINGS_EXTRA_FIXTURE`` — дополнительный JSON для demo;
     * ``DROM_LISTINGS_ACCESS_APPROVED=yes`` — обязательный локальный флаг для ``drom``,
       который задают после письменного разрешения правообладателя;
     * ``DROM_LISTINGS_HOSTS`` и ``DROM_LISTINGS_REDIRECT_HOSTS`` — точные хосты через запятую.
     """
     source = environ.get("DROM_LISTINGS_SOURCE", "demo").strip().lower() or "demo"
     fixture = environ.get("DROM_LISTINGS_FIXTURE")
+    extra_fixture = environ.get("DROM_LISTINGS_EXTRA_FIXTURE")
     approved = environ.get("DROM_LISTINGS_ACCESS_APPROVED", "").strip().lower() == "yes"
     if source not in ("demo", "drom"):
         raise ValueError(f"DROM_LISTINGS_SOURCE: ожидается demo или drom, получено {source!r}")
     if source == "demo":
-        return make_importer(source, fixture_path=Path(fixture) if fixture else None)
+        return make_importer(
+            source,
+            fixture_path=Path(fixture) if fixture else None,
+            additional_fixture_paths=(Path(extra_fixture),) if extra_fixture else (),
+        )
 
     hosts = environ.get("DROM_LISTINGS_HOSTS", "").strip()
     redirects = environ.get("DROM_LISTINGS_REDIRECT_HOSTS", "").strip()
