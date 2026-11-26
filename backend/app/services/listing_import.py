@@ -1,5 +1,4 @@
 from collections.abc import Awaitable, Callable
-from os import environ
 
 from pydantic import ValidationError
 
@@ -20,9 +19,6 @@ class ListingImportError(Exception):
 
 
 def make_parser_importer() -> ListingImporter:
-    source = environ.get("DROM_LISTINGS_SOURCE", "demo").strip().lower() or "demo"
-    if source != "demo":
-        raise ValueError("DROM_LISTINGS_SOURCE: Core Backend поддерживает только demo")
     return adapt_parser(importer_from_env())
 
 

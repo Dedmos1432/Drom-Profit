@@ -179,10 +179,17 @@ def test_parser_created_once_per_application(monkeypatch):
     assert [preview.model_dump() for preview in previews] == DEMO_ROWS[:2]
 
 
-@pytest.mark.parametrize("source", ["invalid", "drom"])
-def test_unsupported_source_fails_at_app_creation(monkeypatch, source):
-    monkeypatch.setenv("DROM_LISTINGS_SOURCE", source)
+def test_unsupported_source_fails_at_app_creation(monkeypatch):
+    monkeypatch.setenv("DROM_LISTINGS_SOURCE", "invalid")
     with pytest.raises(ValueError, match="DROM_LISTINGS_SOURCE"):
+        create_app()
+
+
+def test_drom_requires_approval_at_app_creation(monkeypatch):
+    monkeypatch.setenv("DROM_LISTINGS_SOURCE", "drom")
+    monkeypatch.setenv("DROM_LISTINGS_HOSTS", "auto.drom.ru")
+    monkeypatch.delenv("DROM_LISTINGS_ACCESS_APPROVED", raising=False)
+    with pytest.raises(RuntimeError, match="Доступ к Дрому не согласован"):
         create_app()
 
 
@@ -217,23 +224,42 @@ def test_waiting_import_does_not_hold_pg_connection(db_url):
 
 
 
-def test_saved_drom_document_through_core_adapter(db_url):
+def test_configured_drom_source_through_core_adapter(db_url, monkeypatch):
     from pathlib import Path
 
-    from app.services.listing_import import adapt_parser
-    from app.services.listings.drom_provider import listing_from_html
-    from app.services.listings.urls import HostAllowlist, validate_listing_url
+    from app.services.listings import drom_provider
+    from app.services.listings.safe_http import HttpResponse
 
-    url = "https://vladivostok.drom.ru/toyota/camry/12345678.html"
-    hosts = HostAllowlist(("vladivostok.drom.ru",))
-    html = (Path(__file__).parent / "listings/samples/synthetic_listing.html").read_text("utf-8")
+    host = "vladivostok.drom.ru"
+    url = f"https://{host}/toyota/camry/12345678.html"
+    html = (Path(__file__).parent / "listings/samples/synthetic_listing.html").read_bytes()
+    started, release = Event(), Event()
 
-    async def parse_saved_document(requested_url):
-        return listing_from_html(html, validate_listing_url(requested_url, hosts))
+    def local_response(target, hosts, redirect_hosts, _limits, _deadline):
+        assert target.canonical == url
+        assert hosts.entries == (host,)
+        assert redirect_hosts == ()
+        started.set()
+        assert release.wait(10)
+        return HttpResponse(target, 200, {"content-type": "text/html; charset=utf-8"}, html)
 
-    with TestClient(create_app(db_url, importer=adapt_parser(parse_saved_document))) as client:
+    monkeypatch.setenv("DROM_LISTINGS_SOURCE", "drom")
+    monkeypatch.setenv("DROM_LISTINGS_ACCESS_APPROVED", "yes")
+    monkeypatch.setenv("DROM_LISTINGS_HOSTS", host)
+    monkeypatch.delenv("DROM_LISTINGS_REDIRECT_HOSTS", raising=False)
+    monkeypatch.setattr(drom_provider, "get_html", local_response)
+    app = create_app(db_url)
+    with TestClient(app) as client, ThreadPoolExecutor(max_workers=1) as executor:
         headers = session_headers(client)
-        preview = client.post(PREVIEW, headers=headers, json={"url": url})
+        pending = executor.submit(client.post, PREVIEW, headers=headers, json={"url": url})
+        try:
+            assert started.wait(5)
+            assert not pending.done()
+            assert app.state.engine.pool.checkedout() == 0
+            assert client.get(CARS, headers=headers).json() == []
+        finally:
+            release.set()
+        preview = pending.result(timeout=5)
         assert preview.status_code == 200
         listing = preview.json()
         assert len(listing) == 18

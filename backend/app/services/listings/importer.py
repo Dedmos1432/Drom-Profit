@@ -78,7 +78,8 @@ def importer_from_env(environ: Mapping[str, str] = os.environ) -> ListingImporte
 
     * ``DROM_LISTINGS_SOURCE`` — ``demo`` (по умолчанию) или ``drom``;
     * ``DROM_LISTINGS_FIXTURE`` — путь к JSON для demo;
-    * ``DROM_LISTINGS_ACCESS_APPROVED=yes`` — обязателен для ``drom``;
+    * ``DROM_LISTINGS_ACCESS_APPROVED=yes`` — обязательный локальный флаг для ``drom``,
+      который задают после письменного разрешения правообладателя;
     * ``DROM_LISTINGS_HOSTS`` и ``DROM_LISTINGS_REDIRECT_HOSTS`` — точные хосты через запятую.
     """
     source = environ.get("DROM_LISTINGS_SOURCE", "demo").strip().lower() or "demo"
