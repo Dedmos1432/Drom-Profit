@@ -3,15 +3,23 @@ package ru.dedmos.dromprofit.presentation.screens.detail
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -24,7 +32,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
@@ -33,6 +43,7 @@ import ru.dedmos.dromprofit.domain.ExpenseInput
 import ru.dedmos.dromprofit.domain.ExpenseKind
 import ru.dedmos.dromprofit.domain.NoteInput
 import ru.dedmos.dromprofit.domain.NoteKind
+import ru.dedmos.dromprofit.presentation.components.ErrorState
 import ru.dedmos.dromprofit.presentation.viewmodels.DetailDialog
 
 @Composable
@@ -53,7 +64,7 @@ internal fun CarRecordDialog(
                 MoneyEditor(
                     title = if (expense == null) "Добавить расход" else "Редактировать расход",
                     initial = MoneyDraft(expense?.title.orEmpty(), expense?.amount, expense?.factorKey, expense?.comment),
-                    initialKind = expense?.kind ?: dialog.kind,
+                    initialKind = expense?.kind ?: ExpenseKind.REPAIR,
                     busy = busy,
                     error = error,
                     onDismiss = onDismiss,
@@ -75,9 +86,6 @@ internal fun CarRecordDialog(
                 }
             }
             is DetailDialog.EditNote -> NoteEditor(dialog, busy, error, onDismiss, onSaveNote)
-            DetailDialog.DeleteCar -> ConfirmationDialog(
-                "Удалить автомобиль?", "Карточка, расходы, преимущества и заметки будут удалены.", busy, error, onDismiss, onDelete,
-            )
             is DetailDialog.DeleteExpense -> ConfirmationDialog(
                 "Удалить расход?", dialog.expense.title, busy, error, onDismiss, onDelete,
             )
@@ -85,7 +93,7 @@ internal fun CarRecordDialog(
                 "Удалить преимущество?", dialog.benefit.title, busy, error, onDismiss, onDelete,
             )
             is DetailDialog.DeleteNote -> ConfirmationDialog(
-                "Удалить запись?", dialog.note.kind.detailTitle, busy, error, onDismiss, onDelete,
+                "Удалить заметку?", dialog.note.kind.detailTitle, busy, error, onDismiss, onDelete,
             )
         }
     }
@@ -108,13 +116,14 @@ private fun MoneyEditor(
     var amountUnknown by rememberSaveable { mutableStateOf(initial.amount == null && initial.title.isNotEmpty()) }
     var factorKey by rememberSaveable { mutableStateOf(initial.factorKey.orEmpty()) }
     var comment by rememberSaveable { mutableStateOf(initial.comment.orEmpty()) }
+    var showEquipment by rememberSaveable { mutableStateOf(false) }
     var kind by rememberSaveable { mutableStateOf(initialKind) }
     var submitted by rememberSaveable { mutableStateOf(false) }
-    val parsedAmount = amount.trim().toLongOrNull()?.takeIf { it >= 0 }
+    val parsedAmount = amount.trim().takeIf { it.all(Char::isDigit) }?.toLongOrNull()
     val invalidName = name.isBlank()
     val invalidAmount = !amountUnknown && parsedAmount == null
 
-    RecordEditorDialog(title, busy, error, onDismiss, onConfirm = {
+    RecordEditorDialog(title, "Сохранить запись", busy, error, onDismiss, onConfirm = {
         submitted = true
         if (!invalidName && !invalidAmount) {
             onSave(
@@ -130,43 +139,67 @@ private fun MoneyEditor(
             enabled = !busy,
             isError = submitted && invalidName,
             supportingText = if (submitted && invalidName) ({ Text("Введите название.") }) else null,
+            shape = MaterialTheme.shapes.medium,
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
         kind?.let { currentKind ->
-            CategoryMenu("Категория", currentKind, ExpenseKind.entries, { it.detailTitle }, !busy) { kind = it }
+            CategoryMenu("Категория расхода", currentKind, ExpenseKind.entries, { it.detailTitle }, !busy) { kind = it }
         }
-        OutlinedTextField(
-            value = if (amountUnknown) "" else amount,
-            onValueChange = { amount = it },
-            label = { Text(if (kind == null) "Персональная ценность, ₽" else "Сумма, ₽") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            isError = submitted && invalidAmount,
-            supportingText = if (submitted && invalidAmount) ({ Text("Укажите целое число от нуля или отметьте неизвестную сумму.") }) else null,
-            enabled = !busy && !amountUnknown,
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        ReviewedRow(amountUnknown, !busy, "Сумма неизвестна") { amountUnknown = it }
-        OutlinedTextField(
-            value = factorKey,
-            onValueChange = { factorKey = it },
-            label = { Text("Код оснащения") },
-            supportingText = { Text("Необязательно. Например, winter_tires.") },
-            enabled = !busy,
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        if (!amountUnknown) {
+            OutlinedTextField(
+                value = amount,
+                onValueChange = { amount = it },
+                label = { Text(if (kind == null) "Персональная ценность, ₽" else "Стоимость, ₽") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                isError = submitted && invalidAmount,
+                supportingText = if (submitted && invalidAmount) {
+                    { Text("Укажите целое число рублей или отметьте неизвестную сумму.") }
+                } else null,
+                enabled = !busy,
+                shape = MaterialTheme.shapes.medium,
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(
+                value = amountUnknown,
+                enabled = !busy,
+                role = Role.Checkbox,
+                onValueChange = { amountUnknown = it },
+            ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Checkbox(amountUnknown, onCheckedChange = null, enabled = !busy)
+            Text(if (kind == null) "Ценность пока неизвестна" else "Стоимость пока неизвестна")
+        }
         OutlinedTextField(
             value = comment,
             onValueChange = { comment = it },
-            label = { Text("Комментарий") },
-            supportingText = { Text("Необязательно") },
+            label = { Text("Комментарий (необязательно)") },
             enabled = !busy,
+            shape = MaterialTheme.shapes.medium,
             minLines = 2,
             maxLines = 4,
             modifier = Modifier.fillMaxWidth(),
         )
+        TextButton(onClick = { showEquipment = !showEquipment }, enabled = !busy) {
+            Text(if (showEquipment) "Свернуть обозначение оснащения" else "Связать одинаковое оснащение")
+        }
+        if (showEquipment) {
+            OutlinedTextField(
+                value = factorKey,
+                onValueChange = { factorKey = it },
+                label = { Text("Обозначение оснащения (необязательно)") },
+                supportingText = { Text("Используйте одно и то же обозначение для одинакового оснащения.") },
+                enabled = !busy,
+                shape = MaterialTheme.shapes.medium,
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 
@@ -178,17 +211,12 @@ private fun NoteEditor(
     onDismiss: () -> Unit,
     onSave: (NoteInput, String?) -> Unit,
 ) {
-    val initialKind = dialog.note?.kind ?: dialog.kind
-    var kind by rememberSaveable { mutableStateOf(initialKind) }
+    var kind by rememberSaveable { mutableStateOf(dialog.note?.kind ?: NoteKind.INSPECTION) }
     var text by rememberSaveable { mutableStateOf(dialog.note?.text.orEmpty()) }
     var submitted by rememberSaveable { mutableStateOf(false) }
-    val fromReport = initialKind == NoteKind.REPORT
     RecordEditorDialog(
-        title = when {
-            dialog.note != null -> "Редактировать запись"
-            fromReport -> "Добавить сведения из отчёта"
-            else -> "Добавить заметку"
-        },
+        title = if (dialog.note != null) "Редактировать заметку" else "Добавить заметку",
+        confirmLabel = "Сохранить заметку",
         busy = busy,
         error = error,
         onDismiss = onDismiss,
@@ -197,16 +225,15 @@ private fun NoteEditor(
             if (text.isNotBlank()) onSave(NoteInput(kind, text.trim()), dialog.note?.id)
         },
     ) {
-        if (!fromReport) {
-            CategoryMenu("Категория", kind, NoteKind.entries.filter { it != NoteKind.REPORT }, { it.detailTitle }, !busy) { kind = it }
-        }
+        CategoryMenu("Вид заметки", kind, NoteKind.entries, { it.detailTitle }, !busy) { kind = it }
         OutlinedTextField(
             value = text,
             onValueChange = { text = it },
-            label = { Text(if (fromReport) "Что указано в отчёте" else "Текст заметки") },
+            label = { Text("Текст заметки") },
             isError = submitted && text.isBlank(),
             supportingText = if (submitted && text.isBlank()) ({ Text("Введите текст.") }) else null,
             enabled = !busy,
+            shape = MaterialTheme.shapes.medium,
             minLines = 3,
             maxLines = 7,
             modifier = Modifier.fillMaxWidth(),
@@ -220,8 +247,17 @@ private fun <T> CategoryMenu(label: String, selected: T, options: List<T>, title
     Column {
         DetailHint(label)
         Box {
-            OutlinedButton(onClick = { expanded = true }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
-                Text(title(selected))
+            OutlinedButton(
+                onClick = { expanded = true },
+                enabled = enabled,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                shape = MaterialTheme.shapes.medium,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+            ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(title(selected), modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
+                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                }
             }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 options.forEach { option ->
@@ -238,6 +274,7 @@ private fun <T> CategoryMenu(label: String, selected: T, options: List<T>, title
 @Composable
 private fun RecordEditorDialog(
     title: String,
+    confirmLabel: String,
     busy: Boolean,
     error: String?,
     onDismiss: () -> Unit,
@@ -246,6 +283,7 @@ private fun RecordEditorDialog(
 ) {
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
+        containerColor = MaterialTheme.colorScheme.surface,
         properties = DialogProperties(dismissOnBackPress = !busy, dismissOnClickOutside = !busy),
         title = { Text(title) },
         text = {
@@ -253,14 +291,16 @@ private fun RecordEditorDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 fields()
+                error?.let { ErrorState(it) }
             }
         },
         confirmButton = {
-            Button(onClick = onConfirm, enabled = !busy) { Text(if (busy) "Сохраняем…" else "Сохранить") }
+            Button(onClick = onConfirm, enabled = !busy, shape = MaterialTheme.shapes.medium) {
+                Text(if (busy) "Сохраняем…" else confirmLabel)
+            }
         },
-        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("Отмена") } },
+        dismissButton = { RecordDialogCancel(busy, onDismiss) },
     )
 }
 
@@ -268,6 +308,7 @@ private fun RecordEditorDialog(
 private fun ConfirmationDialog(title: String, message: String, busy: Boolean, error: String?, onDismiss: () -> Unit, onDelete: () -> Unit) {
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
+        containerColor = MaterialTheme.colorScheme.surface,
         properties = DialogProperties(dismissOnBackPress = !busy, dismissOnClickOutside = !busy),
         title = { Text(title) },
         text = {
@@ -277,12 +318,32 @@ private fun ConfirmationDialog(title: String, message: String, busy: Boolean, er
             }
         },
         confirmButton = {
-            Button(onClick = onDelete, enabled = !busy, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+            Button(
+                onClick = onDelete,
+                enabled = !busy,
+                shape = MaterialTheme.shapes.medium,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+            ) {
                 Text(if (busy) "Удаляем…" else "Удалить")
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("Отмена") } },
+        dismissButton = { RecordDialogCancel(busy, onDismiss) },
     )
+}
+
+@Composable
+private fun RecordDialogCancel(busy: Boolean, onDismiss: () -> Unit) {
+    Button(
+        onClick = onDismiss,
+        enabled = !busy,
+        shape = MaterialTheme.shapes.medium,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
+    ) {
+        Text("Отмена")
+    }
 }
 
 private fun String.optionalText(): String? = trim().takeIf(String::isNotEmpty)

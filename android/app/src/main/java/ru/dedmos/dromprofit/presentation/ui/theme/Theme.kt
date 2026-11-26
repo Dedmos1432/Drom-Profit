@@ -10,24 +10,22 @@ import androidx.compose.ui.unit.dp
 
 object ProfitTokens {
     val screenPadding = 16.dp
-    val contentGap = 12.dp
-    val sectionGap = 24.dp
+    val contentGap = 16.dp
     val cardPadding = 16.dp
-    val fieldRadius = 12.dp
     val cardRadius = 16.dp
-    val primaryActionHeight = 52.dp
+    val primaryActionHeight = 48.dp
     val minTouchHeight = 48.dp
 }
 
 private val profitColors = lightColorScheme(
     primary = ActionBlue,
     onPrimary = Color.White,
-    primaryContainer = InfoBackground,
-    onPrimaryContainer = InfoText,
-    secondary = ActionBlue,
+    primaryContainer = ActionBackground,
+    onPrimaryContainer = ActionText,
+    secondary = LinkBlue,
     onSecondary = Color.White,
-    secondaryContainer = InfoBackground,
-    onSecondaryContainer = InfoText,
+    secondaryContainer = ActionBackground,
+    onSecondaryContainer = ActionText,
     tertiary = WarningText,
     tertiaryContainer = WarningBackground,
     onTertiaryContainer = WarningText,
@@ -36,23 +34,23 @@ private val profitColors = lightColorScheme(
     surface = Color.White,
     onSurface = TextPrimary,
     onSurfaceVariant = TextSecondary,
-    surfaceVariant = PanelBackground,
-    surfaceContainer = PanelBackground,
-    surfaceContainerLow = PageBackground,
-    surfaceContainerHigh = PanelBackground,
+    surfaceVariant = SoftPanel,
+    surfaceContainer = SoftPanel,
+    surfaceContainerLow = Color.White,
+    surfaceContainerHigh = SoftPanel,
     outline = Border,
     outlineVariant = Divider,
     error = ErrorText,
     onError = Color.White,
     errorContainer = ErrorBackground,
-    onErrorContainer = ErrorText
+    onErrorContainer = ErrorText,
 )
 
 private val profitShapes = Shapes(
-    small = RoundedCornerShape(ProfitTokens.fieldRadius),
-    medium = RoundedCornerShape(ProfitTokens.fieldRadius),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(12.dp),
     large = RoundedCornerShape(ProfitTokens.cardRadius),
-    extraLarge = RoundedCornerShape(24.dp)
+    extraLarge = RoundedCornerShape(24.dp),
 )
 
 @Composable
@@ -61,6 +59,6 @@ fun DromProfitTheme(content: @Composable () -> Unit) {
         colorScheme = profitColors,
         typography = Typography,
         shapes = profitShapes,
-        content = content
+        content = content,
     )
 }

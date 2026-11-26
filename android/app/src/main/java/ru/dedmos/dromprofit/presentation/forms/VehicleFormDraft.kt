@@ -26,7 +26,7 @@ internal enum class CarField(
     TRANSMISSION("Коробка передач"),
     DRIVE("Привод"),
     IMAGE_URL("Адрес фотографии", CarFieldInput.URI),
-    LISTING_URL("Ссылка на объявление", CarFieldInput.URI),
+    LISTING_URL("Оригинальное объявление", CarFieldInput.URI),
     MARKET_PRICE("Рыночная оценка Дрома, ₽", CarFieldInput.INTEGER),
 }
 

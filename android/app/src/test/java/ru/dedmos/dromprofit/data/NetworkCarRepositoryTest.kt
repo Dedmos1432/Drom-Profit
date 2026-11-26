@@ -9,6 +9,7 @@ import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -123,9 +124,11 @@ class NetworkCarRepositoryTest {
         }
         val error = runCatching { repository.getCars() }.exceptionOrNull() as RepositoryException
         assertEquals("unauthorized", error.code)
+        assertTrue(repository.requiresNewSession.value)
         assertEquals("old", token.value)
         assertEquals(0, issued)
         repository.restartSession()
+        assertFalse(repository.requiresNewSession.value)
         assertEquals("new", token.value)
         assertEquals(1, issued)
         assertTrue(repository.getCars().isEmpty())

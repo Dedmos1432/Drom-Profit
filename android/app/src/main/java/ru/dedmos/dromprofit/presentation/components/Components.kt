@@ -1,5 +1,6 @@
 package ru.dedmos.dromprofit.presentation.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,85 +8,96 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.DirectionsCar
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import ru.dedmos.dromprofit.presentation.ui.theme.BrandRed
-import ru.dedmos.dromprofit.presentation.ui.theme.DromProfitTheme
+import ru.dedmos.dromprofit.domain.Car
+import ru.dedmos.dromprofit.domain.CarSource
+import ru.dedmos.dromprofit.presentation.ui.theme.ActionBackground
+import ru.dedmos.dromprofit.presentation.ui.theme.ActionText
+import ru.dedmos.dromprofit.presentation.ui.theme.DisabledBackground
+import ru.dedmos.dromprofit.presentation.ui.theme.LinkBlue
 import ru.dedmos.dromprofit.presentation.ui.theme.ProfitTokens
+import ru.dedmos.dromprofit.presentation.ui.theme.SuccessBackground
+import ru.dedmos.dromprofit.presentation.ui.theme.SuccessText
+import ru.dedmos.dromprofit.presentation.ui.theme.TextSecondary
 import java.text.NumberFormat
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfitScaffold(
     title: String,
     onBack: (() -> Unit)? = null,
     bottomBar: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
-    content: @Composable (PaddingValues) -> Unit
+    content: @Composable (PaddingValues) -> Unit,
 ) {
+    val navigation = LocalProfitNavigation.current
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        title,
-                        modifier = Modifier.semantics { heading() },
-                        color = if (title == "Drom Profit") BrandRed else MaterialTheme.colorScheme.onSurface,
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                },
-                navigationIcon = {
-                    if (onBack != null) {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
-                        }
-                    }
-                },
-                actions = actions,
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        },
+        contentWindowInsets = WindowInsets.safeDrawing,
+        topBar = { ProfitSiteHeader(navigation, ProfitDestination.fromTitle(title), onBack, actions) },
         bottomBar = bottomBar,
-        content = content
+        content = content,
     )
+}
+
+@Composable
+internal fun ProfitScreenColumn(
+    insets: PaddingValues,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Box(
+        Modifier.fillMaxSize().padding(insets).consumeWindowInsets(insets),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Column(
+            modifier.widthIn(max = 720.dp).fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = ProfitTokens.screenPadding, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            content = content,
+        )
+    }
+}
+
+@Composable
+internal fun PageHeading(title: String, description: String? = null) {
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
+        description?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
 }
 
 @Composable
@@ -93,45 +105,74 @@ fun PrimaryAction(
     modifier: Modifier = Modifier,
     label: String,
     enabled: Boolean = true,
-    onClick: () -> Unit
-) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.fillMaxWidth().heightIn(min = ProfitTokens.primaryActionHeight),
-        shape = MaterialTheme.shapes.small
-    ) { Text(label) }
-}
+    onClick: () -> Unit,
+) = FilledAction(label, modifier.fillMaxWidth(), enabled, MaterialTheme.colorScheme.primary, Color.White, onClick)
 
 @Composable
 fun SecondaryAction(
     modifier: Modifier = Modifier,
     label: String,
     enabled: Boolean = true,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+) = FilledAction(label, modifier.fillMaxWidth(), enabled, ActionBackground, ActionText, onClick)
+
+@Composable
+internal fun ContrastAction(label: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) =
+    FilledAction(label, modifier.fillMaxWidth(), enabled, Color.Black, Color.White, onClick)
+
+@Composable
+internal fun DangerAction(label: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) =
+    FilledAction(label, modifier, enabled, MaterialTheme.colorScheme.error, Color.White, onClick)
+
+@Composable
+private fun FilledAction(
+    label: String,
+    modifier: Modifier,
+    enabled: Boolean,
+    background: Color,
+    foreground: Color,
+    onClick: () -> Unit,
 ) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.heightIn(min = ProfitTokens.primaryActionHeight),
+        shape = MaterialTheme.shapes.medium,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = background,
+            contentColor = foreground,
+            disabledContainerColor = DisabledBackground,
+            disabledContentColor = TextSecondary,
+        ),
+    ) { Text(label, textAlign = TextAlign.Center) }
+}
+
+@Composable
+internal fun OutlineAction(label: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.fillMaxWidth().heightIn(min = ProfitTokens.minTouchHeight),
-        shape = MaterialTheme.shapes.small
-    ) { Text(label) }
+        modifier = modifier.heightIn(min = ProfitTokens.minTouchHeight),
+        shape = MaterialTheme.shapes.medium,
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = LinkBlue, disabledContentColor = TextSecondary),
+        border = BorderStroke(1.dp, if (enabled) LinkBlue else MaterialTheme.colorScheme.outlineVariant),
+    ) { Text(label, textAlign = TextAlign.Center) }
 }
 
 @Composable
 fun Panel(
     modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Column(
             modifier = Modifier.padding(ProfitTokens.cardPadding),
             verticalArrangement = Arrangement.spacedBy(8.dp),
-            content = content
+            content = content,
         )
     }
 }
@@ -146,62 +187,71 @@ fun AmountLine(
     modifier: Modifier = Modifier,
     label: String,
     value: Number?,
-    strong: Boolean = false
+    strong: Boolean = false,
+    missingText: String = "Не указано",
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, modifier = Modifier.weight(1f))
         Text(
-            text = formatRubles(value),
+            text = if (value == null) missingText else formatRubles(value),
             textAlign = TextAlign.End,
-            fontWeight = if (strong) FontWeight.Bold else FontWeight.Normal
+            fontWeight = if (strong) FontWeight.Bold else FontWeight.Normal,
         )
     }
 }
 
-fun formatRubles(value: Number?): String = value?.let {
-    val amount = NumberFormat.getIntegerInstance(Locale.forLanguageTag("ru-RU")).format(it)
-    "$amount\u00A0₽"
-} ?: "Нет данных"
+fun formatRubles(value: Number?): String = value?.let { "${formatInteger(it)}\u00A0₽" } ?: "Не указано"
+
+internal fun formatMileage(value: Long?): String = value?.let { "${formatInteger(it)} км" } ?: "Пробег не указан"
+
+private fun formatInteger(value: Number): String =
+    NumberFormat.getIntegerInstance(Locale.forLanguageTag("ru-RU")).format(value)
+
+internal fun vehicleName(car: Car): String = listOfNotNull("${car.brand} ${car.model}", car.year?.toString()).joinToString(", ")
+
+internal fun vehicleSourceLabel(car: Car): String = when (car.source) {
+    CarSource.DEMO -> if (isDemoModelPhoto(car.imageUrl)) "Демо · фото модели" else "Демо-источник"
+    CarSource.DROM -> "Дром"
+    CarSource.MANUAL -> "Введено вручную"
+}
+
+internal enum class BadgeTone { INFO, NEUTRAL, WARNING, SUCCESS }
+
+@Composable
+internal fun ProfitBadge(text: String, tone: BadgeTone = BadgeTone.INFO) {
+    val colors = MaterialTheme.colorScheme
+    val (background, foreground) = when (tone) {
+        BadgeTone.INFO -> ActionBackground to ActionText
+        BadgeTone.NEUTRAL -> colors.surfaceVariant to colors.onSurfaceVariant
+        BadgeTone.WARNING -> colors.tertiaryContainer to colors.onTertiaryContainer
+        BadgeTone.SUCCESS -> SuccessBackground to SuccessText
+    }
+    Surface(shape = CircleShape, color = background, contentColor = foreground) {
+        Text(text, Modifier.padding(horizontal = 9.dp, vertical = 4.dp), style = MaterialTheme.typography.bodySmall)
+    }
+}
 
 @Composable
 fun StatusLabel(text: String, warning: Boolean = false) {
-    val colors = MaterialTheme.colorScheme
-    Surface(
-        shape = MaterialTheme.shapes.small,
-        color = if (warning) colors.tertiaryContainer else colors.secondaryContainer,
-        contentColor = if (warning) colors.onTertiaryContainer else colors.onSecondaryContainer
-    ) {
-        Text(text, Modifier.padding(horizontal = 10.dp, vertical = 5.dp), style = MaterialTheme.typography.bodySmall)
-    }
+    ProfitBadge(text, if (warning) BadgeTone.WARNING else BadgeTone.INFO)
 }
 
 @Composable
 fun VehicleImage(imageUrl: String?, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        shape = MaterialTheme.shapes.small
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                Icons.Outlined.DirectionsCar,
-                contentDescription = if (imageUrl == null) "Фото отсутствует" else "Фото недоступно",
-                modifier = Modifier.size(28.dp)
-            )
-        }
-    }
+    VehiclePhoto(imageUrl, modifier)
 }
 
 @Composable
 fun EmptyState(title: String, message: String, modifier: Modifier = Modifier) {
-    Panel(modifier) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
-        Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Surface(modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceVariant) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
@@ -210,7 +260,7 @@ fun LoadingState(message: String = "Загрузка…", modifier: Modifier = M
     Column(
         modifier = modifier.fillMaxWidth().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(ProfitTokens.contentGap)
+        verticalArrangement = Arrangement.spacedBy(ProfitTokens.contentGap),
     ) {
         CircularProgressIndicator(Modifier.size(32.dp))
         Text(message, style = MaterialTheme.typography.bodyMedium)
@@ -223,12 +273,9 @@ fun ErrorState(message: String, onRetry: (() -> Unit)? = null, modifier: Modifie
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
     ) {
-        Column(
-            modifier = Modifier.padding(ProfitTokens.cardPadding),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Column(Modifier.padding(ProfitTokens.cardPadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(message)
             if (onRetry != null) TextButton(onClick = onRetry) { Text("Повторить") }
         }
@@ -236,44 +283,29 @@ fun ErrorState(message: String, onRetry: (() -> Unit)? = null, modifier: Modifie
 }
 
 @Composable
-fun SessionExpiredState(
-    onRestart: () -> Unit,
-    modifier: Modifier = Modifier,
-    error: String? = null
-) {
-    var confirm by rememberSaveable { mutableStateOf(false) }
+fun SessionExpiredState(onRestart: () -> Unit, modifier: Modifier = Modifier, error: String? = null) {
     Panel(modifier) {
-        Text("Сессия недоступна", style = MaterialTheme.typography.titleMedium)
-        Text("Можно начать новую анонимную сессию с пустой выборкой.")
+        Text("Сессия больше недоступна", style = MaterialTheme.typography.titleMedium)
+        Text("Начните новую сессию, чтобы создать новую выборку.")
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        SecondaryAction(label = "Начать новую сессию", onClick = { confirm = true })
-    }
-    if (confirm) {
-        AlertDialog(
-            onDismissRequest = { confirm = false },
-            title = { Text("Начать новую сессию?") },
-            text = { Text("В новой сессии прежняя выборка будет недоступна.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirm = false
-                    onRestart()
-                }) { Text("Начать") }
-            },
-            dismissButton = { TextButton(onClick = { confirm = false }) { Text("Отмена") } }
-        )
+        PrimaryAction(label = "Начать новую сессию", onClick = onRestart)
     }
 }
 
-@Preview(showBackground = true, widthDp = 360)
 @Composable
-private fun ProfitComponentsPreview() {
-    DromProfitTheme {
-        Panel {
-            Text("Стоимость приобретения", style = MaterialTheme.typography.titleMedium)
-            PriceText(1_300_000L)
-            StatusLabel("Предварительная оценка", warning = true)
-            AmountLine(label = "Преимущества", value = 50_000L)
-            PrimaryAction(label = "Открыть карточку", onClick = {})
-        }
-    }
+internal fun DeleteCarConfirmation(name: String, pending: Boolean, error: String?, onClose: () -> Unit, onDelete: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = { if (!pending) onClose() },
+        title = { Text("Удалить автомобиль?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("$name будет удалён из выборки вместе с его расходами, преимуществами и заметками.")
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            DangerAction(label = if (pending) "Удаляем…" else "Удалить", enabled = !pending, onClick = onDelete)
+        },
+        dismissButton = { TextButton(onClick = onClose, enabled = !pending) { Text("Отмена") } },
+    )
 }

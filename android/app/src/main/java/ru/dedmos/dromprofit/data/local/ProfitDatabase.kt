@@ -54,6 +54,9 @@ internal abstract class CarDao {
     @Query("SELECT MAX(position) FROM cars WHERE scope = :scope")
     protected abstract suspend fun lastPosition(scope: String): Long?
 
+    @Query("SELECT MIN(position) FROM cars WHERE scope = :scope")
+    protected abstract suspend fun firstPosition(scope: String): Long?
+
     @Query("DELETE FROM cars WHERE scope = :scope AND id = :id")
     abstract suspend fun deleteCar(scope: String, id: String): Int
 
@@ -87,9 +90,24 @@ internal abstract class CarDao {
     }
 
     @Transaction
+    open suspend fun prependCar(car: CarEntity): CarEntity {
+        val first = firstPosition(car.scope)
+        upsert(car.copy(position = first?.minus(1L) ?: 0L))
+        return requireNotNull(this.car(car.scope, car.id))
+    }
+
+    @Transaction
     open suspend fun replaceSelection(scope: String, cars: List<CarEntity>): List<CarEntity> {
         clearSelection(scope)
         upsertAll(cars)
+        return selection(scope)
+    }
+
+    @Transaction
+    open suspend fun fillEmptySelection(scope: String, samples: List<CarEntity>): List<CarEntity> {
+        val existing = selection(scope)
+        if (existing.isNotEmpty()) return existing
+        upsertAll(samples)
         return selection(scope)
     }
 }

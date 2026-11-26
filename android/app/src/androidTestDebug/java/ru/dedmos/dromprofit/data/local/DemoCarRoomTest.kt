@@ -12,15 +12,49 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import ru.dedmos.dromprofit.data.DemoCarRepository
+import ru.dedmos.dromprofit.data.DemoScenario
+import ru.dedmos.dromprofit.data.toCarInput
 import ru.dedmos.dromprofit.domain.ExpenseInput
 import ru.dedmos.dromprofit.domain.ExpenseKind
 import ru.dedmos.dromprofit.domain.NoteInput
 import ru.dedmos.dromprofit.domain.NoteKind
+import ru.dedmos.dromprofit.domain.repository.RepositoryException
 import java.io.File
 import java.nio.file.Files
 
 @RunWith(AndroidJUnit4::class)
 class DemoCarRoomTest {
+    @Test
+    fun isolatesShowcaseSeededAndRetryScenarios() = runBlocking {
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.inMemoryDatabaseBuilder(targetContext, ProfitDatabase::class.java).build()
+        try {
+            val dao = database.carDao()
+            val showcase = DemoCarRepository(targetContext, dao, DemoScenario.Showcase)
+            val seeded = DemoCarRepository(targetContext, dao, DemoScenario.Seeded)
+            val listError = DemoCarRepository(targetContext, dao, DemoScenario.ListError)
+
+            val cars = showcase.getCars()
+            assertEquals(listOf("101", "102", "103", "104", "105"), cars.map { it.listingId })
+            assertTrue(cars.all { it.expenses.isNotEmpty() && it.imageUrl?.contains("?gallery=") == true })
+            assertTrue(cars.first { it.listingId == "102" }.expenses.any { it.amount == null })
+            assertEquals(listOf("car-1", "car-2", "car-3"), seeded.getCars().map { it.id })
+
+            val listing = listError.importListing("https://auto.drom.ru/demo/101.html")
+            val failure = runCatching { listError.getCars() }.exceptionOrNull() as? RepositoryException
+            assertEquals("mock_list_error", failure?.code)
+            assertTrue(listError.getCars().isEmpty())
+
+            val imported = listError.createCar(listing.toCarInput())
+            assertEquals("101", imported.listingId)
+            assertTrue(imported.expenses.isEmpty())
+            assertEquals(imported.id, listError.getCars().single().id)
+            assertEquals(5, showcase.getCars().size)
+        } finally {
+            database.close()
+        }
+    }
+
     @Test
     fun migratesPrivateDemoSelectionAndPersistsEditsWithoutReseeding() = runBlocking {
         val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
@@ -62,6 +96,15 @@ class DemoCarRoomTest {
 
             reopened.deleteCar("legacy-car")
             val reopenedAfterDeletion = DemoCarRepository(migrationContext, dao, startEmpty = false)
+            assertTrue(reopenedAfterDeletion.getCars().isEmpty())
+
+            val samples = empty.loadDemoCars()
+            assertEquals(2, samples.size)
+            val sampleId = samples.first().id
+            val added = empty.saveExpense(sampleId, ExpenseInput("Проверка", ExpenseKind.REPAIR, amount = 5_000))
+            val samplesAfterRetry = empty.loadDemoCars()
+            assertEquals(samples.map { it.id }, samplesAfterRetry.map { it.id })
+            assertTrue(samplesAfterRetry.first().expenses.any { it.id == added.id })
             assertTrue(reopenedAfterDeletion.getCars().isEmpty())
         } finally {
             database.close()

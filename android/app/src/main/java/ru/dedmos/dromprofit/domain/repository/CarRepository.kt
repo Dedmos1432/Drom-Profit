@@ -1,5 +1,7 @@
 package ru.dedmos.dromprofit.domain.repository
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import ru.dedmos.dromprofit.domain.Benefit
 import ru.dedmos.dromprofit.domain.BenefitInput
 import ru.dedmos.dromprofit.domain.Car
@@ -14,9 +16,12 @@ import ru.dedmos.dromprofit.domain.Summary
 
 interface CarRepository {
     val isDemo: Boolean
+    val requiresNewSession: Flow<Boolean> get() = flowOf(false)
 
     suspend fun restartSession()
     suspend fun getCars(): List<Car>
+    suspend fun loadDemoCars(): List<Car> =
+        throw RepositoryException("demo_unavailable", "Демо-автомобили доступны в демонстрационном режиме.")
     suspend fun getCar(carId: String): Car
     suspend fun importListing(url: String): ListingData
     suspend fun createCar(input: CarInput): Car

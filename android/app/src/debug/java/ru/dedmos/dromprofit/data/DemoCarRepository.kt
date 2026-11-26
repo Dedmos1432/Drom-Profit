@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import ru.dedmos.dromprofit.data.local.CarDao
 import ru.dedmos.dromprofit.data.local.CarEntity
 import ru.dedmos.dromprofit.data.local.toDomain
@@ -35,34 +36,78 @@ import java.io.IOException
 import java.net.URI
 import java.util.UUID
 
+internal enum class DemoScenario(val key: String, val scope: String, val legacyFile: String? = null) {
+    // Keep the storage scopes used by earlier debug builds.
+    Empty("empty", "demo/seeded", "demo-cars.json"),
+    AlternateEmpty("alternate-empty", "demo/empty", "demo-cars-empty.json"),
+    Seeded("seeded", "demo/scenario/seeded"),
+    Showcase("showcase", "demo/scenario/showcase"),
+    ListError("list-error", "demo/scenario/list-error"),
+}
+
 internal class DemoCarRepository(
     context: Context,
     private val cars: CarDao,
-    private val startEmpty: Boolean
+    private val scenario: DemoScenario,
 ) : CarRepository {
+    constructor(context: Context, cars: CarDao, startEmpty: Boolean) : this(
+        context,
+        cars,
+        if (startEmpty) DemoScenario.AlternateEmpty else DemoScenario.Empty,
+    )
+
     override val isDemo = true
     private val assets = context.assets
-    private val scope = if (startEmpty) "demo/empty" else "demo/seeded"
-    private val legacyFile = if (startEmpty) "demo-cars-empty.json" else "demo-cars.json"
-    private val legacyStorage = PrivateTextFile(AtomicFile(File(context.noBackupFilesDir, legacyFile)))
+    private val scope = scenario.scope
+    private val legacyStorage = scenario.legacyFile?.let { file ->
+        PrivateTextFile(AtomicFile(File(context.noBackupFilesDir, file)))
+    }
     private val mutex = Mutex()
+    private var failNextList = scenario == DemoScenario.ListError
+
+    private val showcaseCars by lazy { assetObjects("showcase-cars.json").map(JsonObject::readCar) }
 
     private val listings by lazy {
-        assetObjects("import-listings.json").map(JsonObject::readListing).associateBy { it.sourceUrl }
+        (assetObjects("import-listings.json").map(JsonObject::readListing) + showcaseCars.map(Car::toListingData))
+            .associateBy { it.sourceUrl }
     }
 
-    override suspend fun restartSession() = withStore { cars.clearSelection(scope) }
+    override suspend fun restartSession() {
+        withStore { cars.replaceSelection(scope, initialCars().toRows()) }
+    }
 
-    override suspend fun getCars(): List<Car> = withStore { cars.selection(scope).map(CarEntity::toDomain) }
+    override suspend fun getCars(): List<Car> = withStore {
+        if (failNextList) {
+            failNextList = false
+            throw RepositoryException("mock_list_error", "Не удалось загрузить выборку.")
+        }
+        cars.selection(scope).map(CarEntity::toDomain)
+    }
+
+    override suspend fun loadDemoCars(): List<Car> = withStore {
+        val samples = seededCars().take(2).toRows()
+        cars.fillEmptySelection(scope, samples).map(CarEntity::toDomain)
+    }
 
     override suspend fun getCar(carId: String): Car = withStore { requireCar(carId) }
 
     override suspend fun importListing(url: String): ListingData = withStore {
-        val uri = runCatching { URI(url) }.getOrNull()
-        if (uri == null || uri.scheme != "https" || uri.host != "auto.drom.ru" || uri.rawAuthority != uri.host) {
+        val uri = url.toHttpUrlOrNull()
+        if (uri == null || (uri.host != "drom.ru" && !uri.host.endsWith(".drom.ru")) ||
+            uri.username.isNotEmpty() || uri.password.isNotEmpty()
+        ) {
             throw RepositoryException("invalid_url", "URL объявления не поддерживается.")
         }
-        listings[url] ?: throw RepositoryException(
+        val canonicalUrl = uri.toString()
+        when (canonicalUrl) {
+            "https://auto.drom.ru/demo/forbidden.html" ->
+                throw RepositoryException("source_forbidden", "Источник недоступен для импорта.")
+            "https://auto.drom.ru/demo/parse-error.html" ->
+                throw RepositoryException("parse_error", "Не удалось прочитать объявление.")
+            "https://auto.drom.ru/demo/source-unavailable.html" ->
+                throw RepositoryException("source_unavailable", "Источник временно недоступен.")
+        }
+        listings[canonicalUrl] ?: throw RepositoryException(
             "listing_unavailable",
             "Объявление недоступно в демонстрационном источнике."
         )
@@ -70,7 +115,7 @@ internal class DemoCarRepository(
 
     override suspend fun createCar(input: CarInput): Car = withStore {
         input.validate()
-        cars.saveCar(input.toCar(newId()).toEntity(scope)).toDomain()
+        cars.prependCar(input.toCar(newId()).toEntity(scope)).toDomain()
     }
 
     override suspend fun updateCar(original: Car, input: CarInput): Car = updateCar(original.id) { car ->
@@ -189,14 +234,31 @@ internal class DemoCarRepository(
 
     private suspend fun initializeSelection() {
         if (cars.isInitialized(scope)) return
-        val legacy = legacyStorage.readOrNull()
-        val objects = when {
-            legacy != null -> parseObjects(legacy)
-            startEmpty -> emptyList()
-            else -> assetObjects("demo-cars.json")
+        val legacy = legacyStorage?.readOrNull()
+        val initial = legacy?.let { parseObjects(it).map(JsonObject::readCar) } ?: initialCars()
+        cars.initializeDemo(scope, initial.toRows())
+    }
+
+    private fun initialCars(): List<Car> = when (scenario) {
+        DemoScenario.Seeded -> seededCars()
+        DemoScenario.Showcase -> showcaseCars
+        else -> emptyList()
+    }
+
+    private fun seededCars(): List<Car> = assetObjects("demo-cars.json").map { json ->
+        val car = json.readCar()
+        val modelPhoto = when (car.id) {
+            "car-1", "car-3" -> "camry-xv50-silver.jpg"
+            "car-2" -> "camry-xv50-white.jpg"
+            else -> null
         }
-        val rows = objects.mapIndexed { index, json -> json.readCar().toEntity(scope, index.toLong()) }
-        cars.initializeDemo(scope, rows)
+        if (car.imageUrl == null && modelPhoto != null) {
+            car.copy(imageUrl = "file:///android_asset/demo/vehicles/" + modelPhoto)
+        } else car
+    }
+
+    private fun List<Car>.toRows(): List<CarEntity> = mapIndexed { index, car ->
+        car.toEntity(scope, index.toLong())
     }
 
     private fun assetObjects(name: String): List<JsonObject> =

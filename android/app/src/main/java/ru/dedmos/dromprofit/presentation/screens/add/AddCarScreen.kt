@@ -3,22 +3,22 @@ package ru.dedmos.dromprofit.presentation.screens.add
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,12 +27,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -43,13 +45,16 @@ import ru.dedmos.dromprofit.domain.ListingData
 import ru.dedmos.dromprofit.domain.toListingData
 import ru.dedmos.dromprofit.presentation.components.ErrorState
 import ru.dedmos.dromprofit.presentation.components.LoadingState
-import ru.dedmos.dromprofit.presentation.components.Panel
+import ru.dedmos.dromprofit.presentation.components.PageHeading
 import ru.dedmos.dromprofit.presentation.components.PrimaryAction
+import ru.dedmos.dromprofit.presentation.components.ProfitBreadcrumb
 import ru.dedmos.dromprofit.presentation.components.ProfitScaffold
+import ru.dedmos.dromprofit.presentation.components.ProfitScreenColumn
+import ru.dedmos.dromprofit.presentation.components.SecondaryAction
 import ru.dedmos.dromprofit.presentation.components.StatusLabel
-import ru.dedmos.dromprofit.presentation.components.VehicleImage
+import ru.dedmos.dromprofit.presentation.components.VehiclePhoto
+import ru.dedmos.dromprofit.presentation.components.isDemoModelPhoto
 import ru.dedmos.dromprofit.presentation.ui.theme.DromProfitTheme
-import ru.dedmos.dromprofit.presentation.ui.theme.ProfitTokens
 import ru.dedmos.dromprofit.presentation.viewmodels.CarFormUiState
 import ru.dedmos.dromprofit.presentation.viewmodels.CarFormViewModel
 import ru.dedmos.dromprofit.presentation.viewmodels.ImportPreview
@@ -61,11 +66,18 @@ fun AddCarRoute(
     carId: String? = null,
     onBack: () -> Unit,
     onSaved: (String) -> Unit,
+    initialUrl: String? = null,
+    startManual: Boolean = false,
+    onHome: () -> Unit = onBack,
     viewModel: CarFormViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    LaunchedEffect(carId) {
-        if (carId != null) viewModel.load(carId)
+    LaunchedEffect(carId, initialUrl, startManual) {
+        if (carId != null) {
+            viewModel.load(carId)
+        } else if (!startManual && initialUrl != null) {
+            viewModel.requestInitialImport(initialUrl)
+        }
     }
     LaunchedEffect(state.savedId) {
         state.savedId?.let { id ->
@@ -73,53 +85,38 @@ fun AddCarRoute(
             onSaved(id)
         }
     }
-    BackHandler(enabled = state.saving) { }
 
-    ProfitScaffold(
-        title = if (carId == null) "Добавить автомобиль" else "Редактировать автомобиль",
-        onBack = onBack.takeUnless { state.saving },
-    ) { insets ->
-        val modifier = Modifier
-            .fillMaxSize()
-            .padding(insets)
-            .imePadding()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = ProfitTokens.screenPadding, vertical = ProfitTokens.contentGap)
-
-        if (carId == null) {
-            AddCarContent(
-                state = state,
-                isDemo = viewModel.isDemo,
-                modifier = modifier,
-                onImport = viewModel::importListing,
-                onLinkChange = viewModel::clearLinkError,
-                onDraftChange = viewModel::clearSaveError,
-                onSave = viewModel::save,
-            )
-        } else {
-            Column(modifier, verticalArrangement = Arrangement.spacedBy(ProfitTokens.contentGap)) {
-                val original = state.original
+    BackHandler(enabled = state.saving) {}
+    val title = if (carId == null) "Добавить автомобиль" else "Редактировать характеристики"
+    ProfitScaffold(title = title, onBack = onBack.takeUnless { state.saving }) { insets ->
+        ProfitScreenColumn(insets, Modifier.imePadding()) {
+            ProfitBreadcrumb(current = title, onHome = onHome)
+            PageHeading(title)
+            if (carId == null) {
+                AddCarContent(
+                    state = state,
+                    isDemo = viewModel.isDemo,
+                    initialUrl = initialUrl,
+                    startManual = startManual,
+                    onImport = viewModel::importListing,
+                    onLinkChange = viewModel::clearLinkError,
+                    onDraftChange = viewModel::clearSaveError,
+                    onSave = viewModel::save,
+                )
+            } else {
+                val original = state.original?.takeIf { it.id == carId }
                 val error = state.loadError
                 when {
-                    original?.id == carId -> {
-                        if (original.expensesReviewed || original.benefitsReviewed) {
-                            Text(
-                                "При изменении данных подтверждения расходов и преимуществ сбросятся.",
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        }
-                        key(carId) {
-                            VehicleForm(
-                                initial = original.toListingData(),
-                                submitLabel = "Сохранить изменения",
-                                enabled = !state.saving && state.savedId == null,
-                                saving = state.saving,
-                                saveError = state.saveError,
-                                onChange = viewModel::clearSaveError,
-                                onSubmit = viewModel::save,
-                            )
-                        }
-                    }
+                    original != null -> VehicleForm(
+                        initial = original.toListingData(),
+                        submitLabel = "Сохранить изменения",
+                        enabled = !state.saving && state.savedId == null,
+                        saving = state.saving,
+                        saveError = state.saveError,
+                        onChange = viewModel::clearSaveError,
+                        onSubmit = viewModel::save,
+                        onCancel = onBack,
+                    )
                     error != null -> ErrorState(error, onRetry = { viewModel.load(carId) })
                     else -> LoadingState("Загружаем автомобиль…")
                 }
@@ -132,51 +129,37 @@ fun AddCarRoute(
 private fun AddCarContent(
     state: CarFormUiState,
     isDemo: Boolean,
+    initialUrl: String?,
+    startManual: Boolean,
     onImport: (String) -> Unit,
     onLinkChange: () -> Unit,
     onDraftChange: () -> Unit,
     onSave: (CarInput) -> Unit,
-    modifier: Modifier = Modifier,
 ) {
-    var manual by rememberSaveable { mutableStateOf(false) }
-    var link by rememberSaveable { mutableStateOf(state.preview?.requestedUrl.orEmpty()) }
+    var manual by rememberSaveable(startManual) { mutableStateOf(startManual) }
+    var link by rememberSaveable(initialUrl) { mutableStateOf(initialUrl.orEmpty()) }
     val drafts = rememberSaveableStateHolder()
-    val enabled = !state.importing && !state.saving && state.savedId == null
+    val canSave = !state.saving && state.savedId == null
+    val setMethod: (Boolean) -> Unit = { next ->
+        manual = next
+        onDraftChange()
+    }
 
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(ProfitTokens.contentGap)) {
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            SegmentedButton(
-                selected = !manual,
-                onClick = {
-                    if (manual) onDraftChange()
-                    manual = false
-                },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                enabled = enabled,
-                label = { Text("По ссылке") },
-            )
-            SegmentedButton(
-                selected = manual,
-                onClick = {
-                    if (!manual) onDraftChange()
-                    manual = true
-                },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                enabled = enabled,
-                label = { Text("Вручную") },
-            )
-        }
-
+    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        AddMethodPicker(manual, !state.saving, setMethod)
         if (manual) {
-            drafts.SaveableStateProvider("manual") {
-                VehicleForm(
-                    submitLabel = "Сохранить автомобиль",
-                    enabled = enabled,
-                    saving = state.saving,
-                    saveError = state.saveError,
-                    onChange = onDraftChange,
-                    onSubmit = onSave,
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                FormSectionHeading("Ручное добавление")
+                drafts.SaveableStateProvider("manual") {
+                    VehicleForm(
+                        submitLabel = "Сохранить автомобиль",
+                        enabled = canSave,
+                        saving = state.saving,
+                        saveError = state.saveError,
+                        onChange = onDraftChange,
+                        onSubmit = onSave,
+                    )
+                }
             }
         } else {
             ImportPanel(
@@ -185,41 +168,17 @@ private fun AddCarContent(
                     link = it
                     onLinkChange()
                 },
+                state = state,
                 isDemo = isDemo,
-                enabled = enabled,
-                error = state.linkError,
-                onImport = { onImport(link) },
+                onSubmit = { onImport(link) },
+                onManual = { setMethod(true) },
             )
-            if (state.importing) LoadingState("Получаем данные объявления…")
-            state.importError?.let {
-                ErrorState(it)
-                TextButton(onClick = {
-                    onDraftChange()
-                    manual = true
-                }, enabled = enabled) { Text("Ввести данные вручную") }
-            }
-
             state.preview?.takeIf { it.requestedUrl == link.trim() }?.let { preview ->
-                val listing = preview.listing
-                Text(
-                    "Предпросмотр автомобиля",
-                    modifier = Modifier.semantics { heading() },
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                if (listing.source == CarSource.DEMO) StatusLabel("Демо-источник")
-                Text(
-                    "Проверьте данные и при необходимости исправьте их перед сохранением.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                if (listing.source != CarSource.DEMO && listing.imageUrl != null) {
-                    VehicleImage(listing.imageUrl, Modifier.fillMaxWidth().height(156.dp))
-                }
                 drafts.SaveableStateProvider("import") {
                     key(preview.version) {
-                        VehicleForm(
-                            initial = listing,
-                            submitLabel = "Сохранить автомобиль",
-                            enabled = enabled,
+                        ListingPreview(
+                            listing = preview.listing,
+                            enabled = canSave && !state.importing,
                             saving = state.saving,
                             saveError = state.saveError,
                             onChange = onDraftChange,
@@ -233,50 +192,162 @@ private fun AddCarContent(
 }
 
 @Composable
-private fun ImportPanel(
-    link: String,
-    onLinkChange: (String) -> Unit,
-    isDemo: Boolean,
-    enabled: Boolean,
-    error: String?,
-    onImport: () -> Unit,
-) {
-    val focus = LocalFocusManager.current
-    val submit = {
-        if (enabled) {
-            focus.clearFocus()
-            onImport()
+@OptIn(ExperimentalLayoutApi::class)
+private fun AddMethodPicker(manual: Boolean, enabled: Boolean, onSelect: (Boolean) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text("Способ добавления", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        FlowRow(
+            modifier = Modifier.selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            MethodOption("По ссылке", !manual, enabled) { onSelect(false) }
+            MethodOption("Вручную", manual, enabled) { onSelect(true) }
         }
-    }
-    Panel {
-        OutlinedTextField(
-            value = link,
-            onValueChange = onLinkChange,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = enabled,
-            label = { Text("Ссылка на объявление Дрома") },
-            placeholder = { Text("https://auto.drom.ru/…") },
-            supportingText = if (error != null) ({ Text(error) }) else null,
-            isError = error != null,
-            singleLine = true,
-            shape = MaterialTheme.shapes.medium,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
-            keyboardActions = KeyboardActions(onGo = { submit() }),
-        )
-        if (isDemo) {
-            TextButton(enabled = enabled, onClick = { onLinkChange(DEMO_LINK) }) {
-                Text("Вставить демоссылку")
-            }
-        }
-        PrimaryAction(label = "Получить данные", enabled = enabled, onClick = submit)
     }
 }
 
-@Preview(name = "Импорт объявления", showBackground = true, widthDp = 393, heightDp = 852)
+@Composable
+private fun MethodOption(label: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.heightIn(min = 48.dp)
+            .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        RadioButton(selected = selected, onClick = null, enabled = enabled)
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun ImportPanel(
+    link: String,
+    onLinkChange: (String) -> Unit,
+    state: CarFormUiState,
+    isDemo: Boolean,
+    onSubmit: () -> Unit,
+    onManual: () -> Unit,
+) {
+    val enabled = !state.importing && !state.saving && state.savedId == null
+    val focusManager = LocalFocusManager.current
+    val submit = {
+        focusManager.clearFocus()
+        onSubmit()
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.extraLarge,
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                "Поддерживаются ссылки на объявления Дрома. Данные можно проверить перед сохранением.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (isDemo) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        "Для демопроверки подойдёт",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    SelectionContainer {
+                        Text(
+                            DEMO_LINK,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            ListingLinkField(
+                value = link,
+                onValueChange = onLinkChange,
+                enabled = enabled,
+                error = state.linkError,
+                onSubmit = submit,
+            )
+            PrimaryAction(
+                label = if (state.importing) "Получаем данные…" else "Получить данные",
+                enabled = enabled,
+                onClick = submit,
+            )
+            state.importError?.let { error ->
+                FormAlert("Не удалось получить данные", error)
+                SecondaryAction(label = "Ввести данные вручную", enabled = !state.saving, onClick = onManual)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ListingPreview(
+    listing: ListingData,
+    enabled: Boolean,
+    saving: Boolean,
+    saveError: String?,
+    onChange: () -> Unit,
+    onSubmit: (CarInput) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        FormSectionHeading("Предпросмотр автомобиля")
+        if (listing.source == CarSource.DEMO) {
+            StatusLabel(if (isDemoModelPhoto(listing.imageUrl)) "Демо · фото модели" else "Демо-источник")
+        }
+        Text(
+            text = if (listing.source == CarSource.DEMO) {
+                "Показаны синтетические данные. Проверьте и при необходимости измените их перед сохранением."
+            } else {
+                "Проверьте данные и при необходимости исправьте их перед сохранением."
+            },
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        listing.imageUrl?.let { imageUrl ->
+            VehiclePhoto(
+                imageUrl = imageUrl,
+                modifier = Modifier.width(160.dp).aspectRatio(4f / 3f),
+                contentDescription = "Фотография автомобиля",
+            )
+        }
+        VehicleForm(
+            initial = listing,
+            submitLabel = "Сохранить автомобиль",
+            enabled = enabled,
+            saving = saving,
+            saveError = saveError,
+            onChange = onChange,
+            onSubmit = onSubmit,
+        )
+    }
+}
+
+@Composable
+private fun FormSectionHeading(text: String) {
+    Text(
+        text = text,
+        modifier = Modifier.semantics { heading() },
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.Bold,
+    )
+}
+
+@Preview(name = "Добавление по ссылке", showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 private fun ImportCarPreview() = AddCarScreenPreview(CarFormUiState())
 
-@Preview(name = "Подтверждение демоимпорта", showBackground = true, widthDp = 393, heightDp = 852)
+@Preview(name = "Получение данных", showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+private fun LoadingImportPreview() = AddCarScreenPreview(CarFormUiState(importing = true), link = DEMO_LINK)
+
+@Preview(name = "Ошибка импорта", showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+private fun FailedImportPreview() = AddCarScreenPreview(
+    CarFormUiState(importError = "Объявление недоступно. Проверьте ссылку или добавьте автомобиль вручную."),
+    link = "https://auto.drom.ru/demo/404.html",
+)
+
+@Preview(name = "Подтверждение демоимпорта", showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 private fun ConfirmImportPreview() {
     val listing = ListingData(
@@ -288,42 +359,25 @@ private fun ConfirmImportPreview() {
         year = 2015,
         city = "Владивосток",
     )
-    AddCarScreenPreview(CarFormUiState(preview = ImportPreview(DEMO_LINK, listing, version = 1)))
+    AddCarScreenPreview(CarFormUiState(preview = ImportPreview(DEMO_LINK, listing, version = 1)), link = DEMO_LINK)
 }
 
 @Composable
-private fun AddCarScreenPreview(state: CarFormUiState) {
+private fun AddCarScreenPreview(state: CarFormUiState, link: String? = null) {
     DromProfitTheme {
         ProfitScaffold(title = "Добавить автомобиль", onBack = {}) { insets ->
-            AddCarContent(
-                state = state,
-                isDemo = true,
-                modifier = Modifier.padding(insets).verticalScroll(rememberScrollState())
-                    .padding(ProfitTokens.screenPadding),
-                onImport = {},
-                onLinkChange = {},
-                onDraftChange = {},
-                onSave = {},
-            )
-        }
-    }
-}
-
-@Preview(name = "Ручное добавление", showBackground = true, widthDp = 393, heightDp = 852)
-@Composable
-private fun ManualCarPreview() {
-    DromProfitTheme {
-        ProfitScaffold(title = "Добавить автомобиль", onBack = {}) { insets ->
-            Column(
-                Modifier.padding(insets).verticalScroll(rememberScrollState()).padding(ProfitTokens.screenPadding),
-            ) {
-                VehicleForm(
-                    submitLabel = "Сохранить автомобиль",
-                    enabled = true,
-                    saving = false,
-                    saveError = null,
-                    onChange = {},
-                    onSubmit = {},
+            ProfitScreenColumn(insets) {
+                ProfitBreadcrumb(current = "Добавить автомобиль", onHome = {})
+                PageHeading("Добавить автомобиль")
+                AddCarContent(
+                    state = state,
+                    isDemo = true,
+                    initialUrl = link,
+                    startManual = false,
+                    onImport = {},
+                    onLinkChange = {},
+                    onDraftChange = {},
+                    onSave = {},
                 )
             }
         }

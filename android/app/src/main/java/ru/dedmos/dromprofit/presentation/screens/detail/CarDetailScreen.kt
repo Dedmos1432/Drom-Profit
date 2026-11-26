@@ -1,42 +1,43 @@
 package ru.dedmos.dromprofit.presentation.screens.detail
 
-import android.net.Uri
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -45,131 +46,104 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.math.BigInteger
+import java.net.URI
 import java.text.NumberFormat
 import java.util.Locale
+import kotlinx.coroutines.launch
 import ru.dedmos.dromprofit.domain.AssessmentStatus
 import ru.dedmos.dromprofit.domain.Car
 import ru.dedmos.dromprofit.domain.CarSource
-import ru.dedmos.dromprofit.domain.NoteKind
+import ru.dedmos.dromprofit.domain.Expense
+import ru.dedmos.dromprofit.domain.ExpenseKind
 import ru.dedmos.dromprofit.domain.Summary
-import ru.dedmos.dromprofit.presentation.components.AmountLine
+import ru.dedmos.dromprofit.presentation.components.BadgeTone
 import ru.dedmos.dromprofit.presentation.components.ErrorState
-import ru.dedmos.dromprofit.presentation.components.formatRubles
 import ru.dedmos.dromprofit.presentation.components.LoadingState
-import ru.dedmos.dromprofit.presentation.components.Panel
-import ru.dedmos.dromprofit.presentation.components.PrimaryAction
+import ru.dedmos.dromprofit.presentation.components.OutlineAction
+import ru.dedmos.dromprofit.presentation.components.PageHeading
+import ru.dedmos.dromprofit.presentation.components.PriceText
+import ru.dedmos.dromprofit.presentation.components.ProfitBadge
+import ru.dedmos.dromprofit.presentation.components.ProfitBreadcrumb
 import ru.dedmos.dromprofit.presentation.components.ProfitScaffold
-import ru.dedmos.dromprofit.presentation.components.SecondaryAction
-import ru.dedmos.dromprofit.presentation.components.StatusLabel
-import ru.dedmos.dromprofit.presentation.components.VehicleImage
+import ru.dedmos.dromprofit.presentation.components.ProfitScreenColumn
+import ru.dedmos.dromprofit.presentation.components.VehicleGallery
+import ru.dedmos.dromprofit.presentation.components.formatMileage
+import ru.dedmos.dromprofit.presentation.components.formatRubles
+import ru.dedmos.dromprofit.presentation.components.isDemoModelPhoto
+import ru.dedmos.dromprofit.presentation.screens.add.EditVehicleDialog
 import ru.dedmos.dromprofit.presentation.ui.theme.DromProfitTheme
 import ru.dedmos.dromprofit.presentation.viewmodels.CarDetailUiState
 import ru.dedmos.dromprofit.presentation.viewmodels.CarDetailViewModel
 import ru.dedmos.dromprofit.presentation.viewmodels.DetailDialog
+import ru.dedmos.dromprofit.presentation.viewmodels.ReviewGroup
 
-private enum class DetailSection(val title: String) {
-    Overview("Автомобиль"),
-    Characteristics("Характеристики"),
-    Expenses("Расходы"),
-    Benefits("Преимущества"),
-    Notes("Осмотр и заметки"),
-    History("История автомобиля"),
-    Calculation("Детализация расчёта"),
+private enum class DetailAnchor(val path: String) {
+    SPECS("specs"),
+    EXPENSES("expenses"),
+    BENEFITS("benefits"),
+    NOTES("notes"),
+    SUMMARY("financial-summary"),
 }
 
 @Composable
 fun CarDetailRoute(
     carId: String,
     onBack: () -> Unit,
-    onEditCar: (String) -> Unit,
-    onDeleted: () -> Unit,
+    initialSection: String? = null,
     viewModel: CarDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var section by rememberSaveable(carId) { mutableStateOf(DetailSection.Overview) }
+    var editing by rememberSaveable(carId) { mutableStateOf(false) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { if (!editing) viewModel.load(carId) }
+    BackHandler(enabled = state.busy) {}
 
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.load(carId) }
-    LaunchedEffect(state.deleted) { if (state.deleted) onDeleted() }
-
-    val back: () -> Unit = {
-        if (!state.busy) {
-            if (section == DetailSection.Overview) onBack() else section = DetailSection.Overview
-        }
-    }
-    BackHandler(enabled = state.busy || section != DetailSection.Overview, onBack = back)
-
-    ProfitScaffold(title = section.title, onBack = back) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+    ProfitScaffold(title = "Автомобиль", onBack = onBack) { insets ->
+        CarDetailColumn(insets) {
             val car = state.car
-            if (car == null) {
-                val error = state.loadError
-                if (error != null) {
-                    ErrorState(error, { viewModel.load(carId) }, Modifier.align(Alignment.Center).padding(16.dp))
-                } else {
-                    LoadingState("Загружаем автомобиль…", Modifier.align(Alignment.Center))
+            when {
+                car != null -> VehicleDetails(
+                    car = car,
+                    state = state,
+                    initialSection = initialSection,
+                    onBack = onBack,
+                    onEdit = { editing = true },
+                    onRetry = { viewModel.load(carId) },
+                    onRetrySummary = viewModel::retrySummary,
+                    onReviewedExpenses = viewModel::reviewExpenses,
+                    onReviewedBenefits = viewModel::reviewBenefits,
+                    onDialog = viewModel::showDialog,
+                )
+                state.loading -> LoadingState("Загружаем автомобиль…")
+                state.notFound -> {
+                    PageHeading(title = "Автомобиль не найден")
+                    DetailHint("Возможно, автомобиль уже удалён из вашей выборки.")
+                    TextButton(onClick = onBack) { Text("Вернуться в выборку") }
                 }
-            } else {
-                key(section) {
-                    Column(
-                        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        state.loadError?.let { ErrorState(it, { viewModel.load(carId) }) }
-                        if (state.dialog == null) {
-                            state.mutationError?.let { ErrorState(it) }
-                            if (state.busy) LoadingState("Сохраняем изменения…")
-                        }
-                        when (section) {
-                            DetailSection.Overview -> CarOverview(
-                                car = car,
-                                state = state,
-                                onSection = { section = it },
-                                onRetrySummary = viewModel::retrySummary,
-                                onDelete = { viewModel.showDialog(DetailDialog.DeleteCar) },
-                            )
-                            DetailSection.Characteristics -> VehicleCharacteristics(
-                                car = car,
-                                enabled = state.actionsEnabled,
-                                onEdit = { onEditCar(carId) },
-                            )
-                            DetailSection.Expenses -> ExpensesSection(
-                                car.expenses,
-                                car.expensesReviewed,
-                                state.actionsEnabled,
-                                viewModel::reviewExpenses,
-                                viewModel::showDialog,
-                            )
-                            DetailSection.Benefits -> BenefitsSection(
-                                car.benefits,
-                                car.benefitsReviewed,
-                                state.actionsEnabled,
-                                viewModel::reviewBenefits,
-                                viewModel::showDialog,
-                            )
-                            DetailSection.Notes, DetailSection.History -> NotesSection(
-                                car.notes,
-                                history = section == DetailSection.History,
-                                enabled = state.actionsEnabled,
-                                onDialog = viewModel::showDialog,
-                            )
-                            DetailSection.Calculation -> SummaryCard(
-                                car,
-                                state.summary,
-                                state.summaryLoading,
-                                state.summaryError,
-                                viewModel::retrySummary,
-                                detailed = true,
-                            )
-                        }
-                    }
+                else -> {
+                    PageHeading(title = "Автомобиль")
+                    ErrorState(
+                        message = state.loadError ?: "Не удалось загрузить автомобиль.",
+                        onRetry = { viewModel.load(carId) },
+                    )
+                    TextButton(onClick = onBack) { Text("Вернуться в выборку") }
                 }
             }
         }
     }
 
-    state.dialog?.let {
+    state.car?.takeIf { editing }?.let { car ->
+        EditVehicleDialog(
+            car = car,
+            onClose = { editing = false },
+            onSaved = {
+                editing = false
+                viewModel.load(carId)
+            },
+        )
+    }
+    state.dialog?.let { dialog ->
         CarRecordDialog(
-            dialog = it,
+            dialog = dialog,
             busy = state.busy,
             error = state.mutationError,
             onDismiss = { viewModel.showDialog(null) },
@@ -181,157 +155,259 @@ fun CarDetailRoute(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun CarOverview(
+private fun CarDetailColumn(
+    insets: PaddingValues,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val usualScrolling = LocalBringIntoViewSpec.current
+    val topPadding = with(LocalDensity.current) { 16.dp.toPx() }
+    val sectionScrolling = remember(topPadding) {
+        object : BringIntoViewSpec {
+            override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float =
+                offset - topPadding
+        }
+    }
+    CompositionLocalProvider(LocalBringIntoViewSpec provides sectionScrolling) {
+        ProfitScreenColumn(insets, Modifier.imePadding()) {
+            CompositionLocalProvider(LocalBringIntoViewSpec provides usualScrolling) { content() }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun VehicleDetails(
     car: Car,
     state: CarDetailUiState,
-    onSection: (DetailSection) -> Unit,
-    onRetrySummary: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    Panel {
-        VehicleImage(car.imageUrl, Modifier.fillMaxWidth().height(180.dp))
-        Text(
-            text = "${car.brand} ${car.model}",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.semantics { heading() },
-        )
-        Text(
-            text = listOfNotNull(car.year?.toString(), car.city?.takeIf(String::isNotBlank)).joinToString(" · ")
-                .ifEmpty { "Год и город не указаны" },
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(formatRubles(car.price), style = MaterialTheme.typography.headlineMedium)
-        StatusLabel(car.source.detailLabel)
-    }
-    SummaryCard(car, state.summary, state.summaryLoading, state.summaryError, onRetrySummary) {
-        onSection(DetailSection.Calculation)
-    }
-    Panel {
-        DetailSection.entries.filter { it != DetailSection.Overview && it != DetailSection.Calculation }
-            .forEachIndexed { index, item ->
-                if (index > 0) HorizontalDivider()
-                ListItem(
-                    headlineContent = { Text(item.title) },
-                    supportingContent = when (item) {
-                        DetailSection.Expenses -> ({ Text(reviewLabel(car.expensesReviewed)) })
-                        DetailSection.Benefits -> ({ Text(reviewLabel(car.benefitsReviewed)) })
-                        DetailSection.History -> ({
-                            Text(if (car.notes.any { it.kind == NoteKind.REPORT }) "Есть записи из отчёта" else "Сведения не внесены")
-                        })
-                        else -> null
-                    },
-                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-                    modifier = Modifier.clickable(role = Role.Button, onClick = { onSection(item) }),
-                )
-            }
-    }
-    TextButton(onClick = onDelete, enabled = state.actionsEnabled, modifier = Modifier.fillMaxWidth()) {
-        Text("Удалить автомобиль", color = if (state.actionsEnabled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-private fun SummaryCard(
-    car: Car,
-    summary: Summary?,
-    loading: Boolean,
-    error: String?,
+    initialSection: String?,
+    onBack: () -> Unit,
+    onEdit: () -> Unit,
     onRetry: () -> Unit,
-    detailed: Boolean = false,
-    onDetails: (() -> Unit)? = null,
+    onRetrySummary: () -> Unit,
+    onReviewedExpenses: (Boolean) -> Unit,
+    onReviewedBenefits: (Boolean) -> Unit,
+    onDialog: (DetailDialog) -> Unit,
 ) {
-    Panel {
-        SectionHeading(if (detailed) "Суммы и полнота данных" else "Экономический расчёт")
-        when {
-            loading -> LoadingState("Загружаем расчёт…")
-            summary == null && error != null -> ErrorState(error, onRetry)
-            summary != null -> {
-                val complete = summary.assessmentStatus == AssessmentStatus.COMPLETE
-                StatusLabel(if (complete) "Оценка полная" else "Предварительная оценка", warning = !complete)
-                if (detailed) {
-                    AmountLine(label = "Цена объявления", value = summary.listingPrice)
-                    AmountLine(label = "Известные вложения", value = summary.totalExpenses)
-                }
-                AmountLine(label = "Предполагаемые затраты на приобретение", value = summary.acquisitionCost, strong = true)
-                if (detailed) AmountLine(label = "Известная ценность преимуществ", value = summary.totalBenefits)
-                AmountLine(label = "Скорректированная стоимость", value = summary.adjustedCost, strong = true)
-                if (detailed) {
-                    DetailHint("Скорректированная стоимость — условный показатель для сравнения автомобилей.")
-                    DetailAttribute("Расходы с неизвестной суммой", summary.unknownExpenses.toString())
-                    DetailAttribute("Преимущества с неизвестной суммой", summary.unknownBenefits.toString())
-                }
-                if (!complete) {
-                    val reasons = buildList {
-                        if (!car.expensesReviewed) add("Расходы не подтверждены.")
-                        if (!car.benefitsReviewed) add("Преимущества не подтверждены.")
-                        if (summary.unknownExpenses > 0 || summary.unknownBenefits > 0) add("Есть неизвестные суммы.")
-                    }
-                    DetailHint((listOf("Учтены только указанные суммы.") + reasons).joinToString(" "))
-                }
-                if (summary.adjustedCost.signum() < 0) {
-                    StatusLabel("Скорректированная стоимость ниже нуля", warning = true)
-                    DetailHint("Проверьте персональную ценность преимуществ.")
-                }
-            }
-            else -> DetailHint("Расчёт пока недоступен.")
-        }
-        if (onDetails != null && summary != null) {
-            SecondaryAction(label = "Детализация расчёта", onClick = onDetails)
+    val name = listOfNotNull("${car.brand} ${car.model}", car.year?.toString()).joinToString(", ")
+    val anchorRequests = remember(car.id) { DetailAnchor.entries.associateWith { BringIntoViewRequester() } }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(car.id, initialSection) {
+        val anchor = DetailAnchor.entries.firstOrNull { it.path == initialSection }
+        if (anchor != null) {
+            withFrameNanos { }
+            anchorRequests.getValue(anchor).bringIntoView()
         }
     }
+
+    ProfitBreadcrumb(current = name, onHome = onBack)
+    state.loadError?.let {
+        ErrorState(
+            message = "Показаны последние загруженные характеристики. $it",
+            onRetry = onRetry,
+        )
+    }
+    VehicleGallery(imageUrl = car.imageUrl, contentDescription = name)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        PageHeading(title = name)
+        ProfitBadge(
+            text = car.sourceLabel(),
+            tone = if (car.source == CarSource.DEMO) BadgeTone.INFO else BadgeTone.NEUTRAL,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            DetailHint("Цена объявления")
+            PriceText(car.price)
+        }
+        car.marketPrice?.let { valuation ->
+            Text("Рыночная оценка Дрома  ${formatRubles(valuation)}")
+        }
+    }
+    VehicleCharacteristics(
+        car = car,
+        modifier = Modifier.bringIntoViewRequester(anchorRequests.getValue(DetailAnchor.SPECS)),
+    )
+    OpenOriginalListing(car)
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
+    ) {
+        OutlineAction(label = "Редактировать характеристики", enabled = state.actionsEnabled, onClick = onEdit)
+        TextButton(onClick = { scope.launch { anchorRequests.getValue(DetailAnchor.SUMMARY).bringIntoView() } }) {
+            Text("К экономической оценке")
+        }
+    }
+    val reviewAvailable = !state.loading && state.loadError == null
+    ExpensesSection(
+        expenses = car.expenses,
+        knownTotal = state.summary?.totalExpenses,
+        reviewed = car.expensesReviewed,
+        enabled = state.actionsEnabled,
+        reviewAvailable = reviewAvailable,
+        reviewError = state.mutationError.takeIf { state.failedReview == ReviewGroup.EXPENSES },
+        onReviewed = onReviewedExpenses,
+        onDialog = onDialog,
+        headingModifier = Modifier.bringIntoViewRequester(anchorRequests.getValue(DetailAnchor.EXPENSES)),
+    )
+    BenefitsSection(
+        benefits = car.benefits,
+        knownTotal = state.summary?.totalBenefits,
+        reviewed = car.benefitsReviewed,
+        enabled = state.actionsEnabled,
+        reviewAvailable = reviewAvailable,
+        reviewError = state.mutationError.takeIf { state.failedReview == ReviewGroup.BENEFITS },
+        onReviewed = onReviewedBenefits,
+        onDialog = onDialog,
+        headingModifier = Modifier.bringIntoViewRequester(anchorRequests.getValue(DetailAnchor.BENEFITS)),
+    )
+    NotesSection(
+        notes = car.notes,
+        enabled = state.actionsEnabled,
+        onDialog = onDialog,
+        headingModifier = Modifier.bringIntoViewRequester(anchorRequests.getValue(DetailAnchor.NOTES)),
+    )
+    FinancialSummary(
+        car = car,
+        state = state,
+        onRetry = onRetrySummary,
+        modifier = Modifier.bringIntoViewRequester(anchorRequests.getValue(DetailAnchor.SUMMARY)),
+    )
+    TextButton(onClick = onBack) { Text("Вернуться в выборку") }
 }
 
 @Composable
-private fun VehicleCharacteristics(car: Car, enabled: Boolean, onEdit: () -> Unit) {
-    Panel {
-        SectionHeading("Данные автомобиля")
-        DetailAttribute("Марка", car.brand)
-        DetailAttribute("Модель", car.model)
+private fun VehicleCharacteristics(car: Car, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        HorizontalDivider()
+        SectionHeading("Характеристики", modifier = Modifier.padding(top = 8.dp))
         DetailAttribute("Год выпуска", car.year?.toString())
-        DetailAttribute("Цена объявления", formatRubles(car.price))
-        DetailAttribute("Пробег", car.mileage?.let { "${formatCharacteristic(it)} км" })
-        DetailAttribute("Комплектация", car.trim)
-        DetailAttribute("Тип двигателя", car.engineType)
-        DetailAttribute("Объём двигателя", car.engineVolume?.let { "${formatCharacteristic(it)} л" })
-        DetailAttribute("Мощность", car.enginePower?.let { "${formatCharacteristic(it)} л. с." })
+        DetailAttribute("Пробег", car.mileage?.let(::formatMileage))
+        DetailAttribute("Двигатель", car.engineLabel())
         DetailAttribute("Коробка передач", car.transmission)
         DetailAttribute("Привод", car.driveType)
         DetailAttribute("Город продажи", car.city)
-        DetailAttribute("Рыночная оценка Дрома", car.marketPrice?.let(::formatRubles))
-        DetailAttribute("Источник", car.source.detailLabel)
-        DetailAttribute("Ссылка на объявление", car.sourceUrl)
-        val uriHandler = LocalUriHandler.current
-        var linkError by rememberSaveable(car.id) { mutableStateOf(false) }
-        val originalUrl = car.sourceUrl?.takeIf { url ->
-            val uri = Uri.parse(url)
-            uri.scheme == "https" && uri.host?.endsWith(".drom.ru", ignoreCase = true) == true
-        }
-        if (car.source == CarSource.DROM && originalUrl != null) {
-            TextButton(onClick = {
-                linkError = runCatching { uriHandler.openUri(originalUrl) }.isFailure
-            }) { Text("Открыть объявление") }
-            if (linkError) DetailHint("Не удалось открыть объявление в браузере.")
-        }
+        DetailAttribute("Комплектация", car.trim)
     }
-    PrimaryAction(label = "Редактировать характеристики", enabled = enabled, onClick = onEdit)
 }
 
 @Composable
-internal fun DetailAttribute(label: String, value: String?) {
+private fun OpenOriginalListing(car: Car) {
+    val original = originalListing(car) ?: return
+    val uriHandler = LocalUriHandler.current
+    var linkError by rememberSaveable(car.id, original) { mutableStateOf(false) }
+    TextButton(onClick = {
+        linkError = runCatching { uriHandler.openUri(original) }.isFailure
+    }) { Text("Оригинальное объявление") }
+    if (linkError) DetailHint("Не удалось открыть объявление в браузере.")
+}
+
+@Composable
+private fun FinancialSummary(
+    car: Car,
+    state: CarDetailUiState,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SectionHeading("Экономическая оценка")
+            val summary = state.summary
+            val complete = summary?.assessmentStatus == AssessmentStatus.COMPLETE
+            when {
+                state.summaryLoading -> DetailHint(
+                    if (summary == null) "Загружаем оценку…" else "Обновляем оценку…",
+                )
+                state.summaryError != null -> ErrorState(
+                    message = state.summaryError,
+                    onRetry = onRetry,
+                )
+                summary != null -> ProfitBadge(
+                    text = if (complete) "Все данные рассмотрены" else "Предварительная оценка",
+                    tone = if (complete) BadgeTone.SUCCESS else BadgeTone.WARNING,
+                )
+            }
+            if (summary != null && !complete) {
+                val reasons = buildList {
+                    add("Учтены только известные суммы.")
+                    if (state.loadError == null && !state.loading) {
+                        if (!car.expensesReviewed) add("Отметьте, что рассмотрели расходы.")
+                        if (!car.benefitsReviewed) add("Отметьте, что рассмотрели преимущества.")
+                    }
+                }
+                DetailHint(reasons.joinToString(" "))
+            }
+            SummaryAmount("Цена объявления", summary?.listingPrice)
+            SummaryAmount("Учтённые вложения", summary?.totalExpenses)
+            SummaryTotal("Предполагаемые затраты на приобретение", summary?.acquisitionCost)
+            SummaryAmount("Ценность преимуществ", summary?.totalBenefits)
+            SummaryTotal("Скорректированная стоимость", summary?.adjustedCost)
+            DetailHint("Учитывает вашу оценку преимуществ при сравнении.")
+            if (summary != null && (summary.unknownExpenses > 0 || summary.unknownBenefits > 0)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Неизвестные суммы", modifier = Modifier.weight(1f))
+                    Column(horizontalAlignment = Alignment.End) {
+                        if (summary.unknownExpenses > 0) Text("Расходы · ${summary.unknownExpenses}")
+                        if (summary.unknownBenefits > 0) Text("Преимущества · ${summary.unknownBenefits}")
+                    }
+                }
+            }
+            if (summary != null && summary.adjustedCost.signum() < 0) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    ProfitBadge("Скорректированная стоимость ниже нуля", BadgeTone.WARNING)
+                    DetailHint("Проверьте персональную ценность указанных преимуществ.")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SummaryAmount(label: String, value: Number?) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(label, Modifier.weight(1f))
+        Text(
+            text = value?.let(::formatRubles) ?: "—",
+            modifier = Modifier.weight(0.55f),
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.End,
+        )
+    }
+}
+
+@Composable
+private fun SummaryTotal(label: String, value: Number?) {
+    HorizontalDivider()
+    Column(Modifier.padding(vertical = 3.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, fontWeight = FontWeight.SemiBold)
+        if (value != null) PriceText(value)
+        else Text("—", style = MaterialTheme.typography.headlineMedium)
+    }
+}
+
+@Composable
+private fun DetailAttribute(label: String, value: String?) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        Text(label, Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value?.takeIf(String::isNotBlank) ?: "Нет данных", Modifier.weight(1f), textAlign = TextAlign.End)
+        Text(label, Modifier.weight(0.42f), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value?.takeIf(String::isNotBlank) ?: "Не указано", Modifier.weight(0.58f))
     }
 }
 
 @Composable
-internal fun SectionHeading(text: String) {
-    Text(text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+internal fun SectionHeading(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.headlineSmall,
+        modifier = modifier.semantics { heading() },
+    )
 }
 
 @Composable
@@ -339,32 +415,34 @@ internal fun DetailHint(text: String) {
     Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
-@Composable
-internal fun ReviewedRow(checked: Boolean, enabled: Boolean, label: String, onChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(checked, enabled = enabled, role = Role.Checkbox, onValueChange = onChange),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Checkbox(checked, onCheckedChange = null, enabled = enabled)
-        Text(label, Modifier.weight(1f))
-    }
+private fun Car.sourceLabel(): String = when (source) {
+    CarSource.DROM -> "Дром"
+    CarSource.DEMO -> if (isDemoModelPhoto(imageUrl)) "Демо · фото модели" else "Демо-источник"
+    CarSource.MANUAL -> "Ручной ввод"
 }
 
-private val CarSource.detailLabel: String
-    get() = when (this) {
-        CarSource.DROM -> "Дром"
-        CarSource.DEMO -> "Демонстрационные данные"
-        CarSource.MANUAL -> "Ручной ввод"
-    }
+private fun Car.engineLabel(): String? {
+    val number = NumberFormat.getNumberInstance(Locale.forLanguageTag("ru-RU"))
+    return listOfNotNull(
+        engineType?.takeIf(String::isNotBlank),
+        engineVolume?.let { number.format(it) + " л" },
+        enginePower?.let { number.format(it) + " л. с." },
+    ).joinToString(", ").takeIf(String::isNotBlank)
+}
 
-private fun reviewLabel(reviewed: Boolean) = if (reviewed) "Просмотрены" else "Требуется подтверждение"
+private fun originalListing(car: Car): String? {
+    val original = car.sourceUrl ?: return null
+    if (car.source == CarSource.DEMO) return null
+    val uri = runCatching { URI(original) }.getOrNull() ?: return null
+    val host = uri.host ?: return null
+    if (uri.scheme?.lowercase(Locale.ROOT) !in listOf("http", "https") || uri.userInfo != null) return null
+    if (host.equals("auto.drom.ru", ignoreCase = true) && uri.path.orEmpty().startsWith("/demo/")) return null
+    return original
+}
 
-private fun formatCharacteristic(value: Number): String = NumberFormat.getNumberInstance(Locale.forLanguageTag("ru-RU")).format(value)
-
-@Preview(name = "Карточка автомобиля", showBackground = true)
+@Preview(name = "Карточка автомобиля · Web", showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun CarOverviewPreview() {
+private fun CarDetailPreview() {
     val car = Car(
         id = "preview",
         sourceUrl = null,
@@ -375,28 +453,40 @@ private fun CarOverviewPreview() {
         mileage = 145_000,
         engineVolume = 2.5,
         transmission = "Автомат",
-        imageUrl = null,
-        source = CarSource.DEMO,
+        imageUrl = "/demo/vehicles/camry-xv50-silver.jpg",
+        engineType = "Бензин",
+        enginePower = 181,
+        driveType = "Передний",
         city = "Владивосток",
+        source = CarSource.DEMO,
+        expenses = listOf(Expense("brakes", "Замена колодок", ExpenseKind.REPAIR, null)),
     )
     val summary = Summary(
         carId = car.id,
         listingPrice = car.price,
-        totalExpenses = BigInteger.valueOf(140_000),
+        totalExpenses = BigInteger.ZERO,
         totalBenefits = BigInteger.ZERO,
-        acquisitionCost = BigInteger.valueOf(1_340_000),
-        adjustedCost = BigInteger.valueOf(1_340_000),
+        acquisitionCost = BigInteger.valueOf(car.price),
+        adjustedCost = BigInteger.valueOf(car.price),
         assessmentStatus = AssessmentStatus.INCOMPLETE,
         unknownExpenses = 1,
         unknownBenefits = 0,
     )
     DromProfitTheme {
-        ProfitScaffold(title = "Автомобиль", onBack = {}) { padding ->
-            Column(
-                Modifier.padding(padding).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                CarOverview(car, CarDetailUiState(car, summary, false, false), {}, {}, {})
+        ProfitScaffold(title = "Автомобиль") { insets ->
+            ProfitScreenColumn(insets) {
+                VehicleDetails(
+                    car,
+                    CarDetailUiState(car = car, summary = summary, loading = false, summaryLoading = false),
+                    initialSection = null,
+                    onBack = {},
+                    onEdit = {},
+                    onRetry = {},
+                    onRetrySummary = {},
+                    onReviewedExpenses = {},
+                    onReviewedBenefits = {},
+                    onDialog = {},
+                )
             }
         }
     }

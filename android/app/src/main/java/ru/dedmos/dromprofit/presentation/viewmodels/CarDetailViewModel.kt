@@ -15,25 +15,21 @@ import ru.dedmos.dromprofit.domain.Car
 import ru.dedmos.dromprofit.domain.usecases.detail.CarDetailUseCases
 import ru.dedmos.dromprofit.domain.Expense
 import ru.dedmos.dromprofit.domain.ExpenseInput
-import ru.dedmos.dromprofit.domain.ExpenseKind
 import ru.dedmos.dromprofit.domain.Note
 import ru.dedmos.dromprofit.domain.NoteInput
-import ru.dedmos.dromprofit.domain.NoteKind
 import ru.dedmos.dromprofit.domain.repository.RepositoryException
 import ru.dedmos.dromprofit.domain.Summary
 
 internal sealed interface DetailDialog {
-    data object DeleteCar : DetailDialog
-    data class EditExpense(
-        val expense: Expense? = null,
-        val kind: ExpenseKind = ExpenseKind.REPAIR,
-    ) : DetailDialog
+    data class EditExpense(val expense: Expense? = null) : DetailDialog
     data class EditBenefit(val benefit: Benefit? = null) : DetailDialog
-    data class EditNote(val note: Note? = null, val kind: NoteKind = NoteKind.OTHER) : DetailDialog
+    data class EditNote(val note: Note? = null) : DetailDialog
     data class DeleteExpense(val expense: Expense) : DetailDialog
     data class DeleteBenefit(val benefit: Benefit) : DetailDialog
     data class DeleteNote(val note: Note) : DetailDialog
 }
+
+internal enum class ReviewGroup { EXPENSES, BENEFITS }
 
 internal data class CarDetailUiState(
     val car: Car? = null,
@@ -44,11 +40,12 @@ internal data class CarDetailUiState(
     val summaryError: String? = null,
     val busy: Boolean = false,
     val mutationError: String? = null,
+    val failedReview: ReviewGroup? = null,
     val dialog: DetailDialog? = null,
-    val deleted: Boolean = false,
+    val notFound: Boolean = false,
 ) {
     val actionsEnabled: Boolean
-        get() = !loading && !summaryLoading && !busy && loadError == null
+        get() = car != null && !loading && !busy && loadError == null
 }
 
 @HiltViewModel
@@ -58,20 +55,21 @@ class CarDetailViewModel @Inject constructor(
     private val mutableState = MutableStateFlow(CarDetailUiState())
     internal val state = mutableState.asStateFlow()
     private var carId: String? = null
+    private var summaryRequest = 0L
 
     internal fun load(id: String) {
         val current = state.value
-        if (current.busy || current.deleted || current.dialog != null) return
-        if (carId != null && (current.loading || current.summaryLoading)) return
+        if (current.busy || current.dialog != null) return
+        if (carId != null && current.loading) return
         if (carId != id) mutableState.value = CarDetailUiState()
         carId = id
-        mutableState.update { it.copy(loading = true, loadError = null, mutationError = null) }
+        mutableState.update { it.copy(loading = true, mutationError = null, failedReview = null) }
         viewModelScope.launch { readCard(id) }
     }
 
     internal fun retrySummary() {
         val id = carId ?: return
-        if (state.value.loading || state.value.summaryLoading || state.value.busy) return
+        if (state.value.car == null || state.value.loading || state.value.summaryLoading || state.value.busy) return
         mutableState.update { it.copy(summaryLoading = true, summaryError = null) }
         viewModelScope.launch { readSummary(id) }
     }
@@ -79,75 +77,107 @@ class CarDetailViewModel @Inject constructor(
     internal fun showDialog(dialog: DetailDialog?) {
         if (dialog != null && !state.value.actionsEnabled) return
         if (state.value.busy) return
-        mutableState.update { it.copy(dialog = dialog, mutationError = null) }
+        mutableState.update { it.copy(dialog = dialog, mutationError = null, failedReview = null) }
     }
 
-    internal fun reviewExpenses(checked: Boolean) = mutate { id ->
+    internal fun reviewExpenses(checked: Boolean) = mutate(reviewGroup = ReviewGroup.EXPENSES) { id ->
         reviewExpenses(id, checked)
     }
 
-    internal fun reviewBenefits(checked: Boolean) = mutate { id ->
+    internal fun reviewBenefits(checked: Boolean) = mutate(reviewGroup = ReviewGroup.BENEFITS) { id ->
         reviewBenefits(id, checked)
     }
 
-    internal fun saveExpense(input: ExpenseInput, id: String?) = mutate { carId ->
-        saveExpense(carId, input, id)
+    internal fun saveExpense(input: ExpenseInput, id: String?) {
+        val current = state.value.car?.expenses?.firstOrNull { it.id == id }
+        if (current != null && ExpenseInput(current.title, current.kind, current.amount, current.factorKey, current.comment) == input) {
+            showDialog(null)
+            return
+        }
+        mutate { carId -> saveExpense(carId, input, id) }
     }
 
-    internal fun saveBenefit(input: BenefitInput, id: String?) = mutate { carId ->
-        saveBenefit(carId, input, id)
+    internal fun saveBenefit(input: BenefitInput, id: String?) {
+        val current = state.value.car?.benefits?.firstOrNull { it.id == id }
+        if (current != null && BenefitInput(current.title, current.amount, current.factorKey, current.comment) == input) {
+            showDialog(null)
+            return
+        }
+        mutate { carId -> saveBenefit(carId, input, id) }
     }
 
-    internal fun saveNote(input: NoteInput, id: String?) = mutate { carId ->
-        saveNote(carId, input, id)
+    internal fun saveNote(input: NoteInput, id: String?) {
+        val current = state.value.car?.notes?.firstOrNull { it.id == id }
+        if (current != null && NoteInput(current.kind, current.text) == input) {
+            showDialog(null)
+            return
+        }
+        mutate(refreshSummary = false) { carId -> saveNote(carId, input, id) }
     }
 
     internal fun confirmDelete() {
         when (val dialog = state.value.dialog) {
-            DetailDialog.DeleteCar -> mutate(deletesCar = true) { id -> deleteCar(id) }
             is DetailDialog.DeleteExpense -> mutate { id -> deleteExpense(id, dialog.expense.id) }
             is DetailDialog.DeleteBenefit -> mutate { id -> deleteBenefit(id, dialog.benefit.id) }
-            is DetailDialog.DeleteNote -> mutate { id -> deleteNote(id, dialog.note.id) }
+            is DetailDialog.DeleteNote -> mutate(refreshSummary = false) { id -> deleteNote(id, dialog.note.id) }
             else -> Unit
         }
     }
 
-    private fun mutate(deletesCar: Boolean = false, action: suspend CarDetailUseCases.(String) -> Unit) {
+    private fun mutate(
+        refreshSummary: Boolean = true,
+        reviewGroup: ReviewGroup? = null,
+        action: suspend CarDetailUseCases.(String) -> Unit,
+    ) {
         val id = carId ?: return
         if (!state.value.actionsEnabled) return
-        mutableState.update { it.copy(busy = true, mutationError = null) }
+        mutableState.update { it.copy(busy = true, mutationError = null, failedReview = null) }
         viewModelScope.launch {
             val result = detailResult { useCases.action(id) }
             if (result.isFailure) {
                 val message = result.exceptionOrNull().detailMessage("Не удалось сохранить изменение.")
-                mutableState.update { it.copy(busy = false, mutationError = message) }
+                mutableState.update { it.copy(busy = false, mutationError = message, failedReview = reviewGroup) }
                 return@launch
             }
-            mutableState.update { it.copy(dialog = null, deleted = deletesCar) }
-            if (!deletesCar) readCard(id)
+            mutableState.update { it.copy(dialog = null) }
+            readCard(id, refreshSummary)
             mutableState.update { it.copy(busy = false) }
         }
     }
 
-    private suspend fun readCard(id: String) {
+    private suspend fun readCard(id: String, refreshSummary: Boolean = true) {
+        if (refreshSummary) summaryRequest++
         mutableState.update {
-            it.copy(loading = true, summaryLoading = true, loadError = null, summaryError = null, summary = null)
+            it.copy(
+                loading = true,
+                loadError = null,
+                notFound = false,
+                summaryLoading = refreshSummary || it.summaryLoading,
+                summaryError = if (refreshSummary) null else it.summaryError,
+            )
         }
         val result = detailResult { useCases.getCar(id) }
         val car = result.getOrNull()
+        val failure = result.exceptionOrNull()
+        val code = (failure as? RepositoryException)?.code
+        val missing = code == "not_found" || code == "http_404"
         mutableState.update {
             it.copy(
-                car = car ?: it.car,
+                car = if (missing) null else car ?: it.car,
                 loading = false,
-                loadError = result.exceptionOrNull()?.detailMessage("Не удалось загрузить автомобиль."),
-                summaryLoading = car != null,
+                loadError = failure?.detailMessage("Не удалось загрузить автомобиль."),
+                notFound = missing,
+                summary = if (missing) null else it.summary,
+                summaryLoading = !missing && (if (refreshSummary) car != null else it.summaryLoading),
             )
         }
-        if (car != null) readSummary(id)
+        if (refreshSummary && car != null) readSummary(id)
     }
 
     private suspend fun readSummary(id: String) {
+        val request = ++summaryRequest
         val result = detailResult { useCases.getSummary(id) }
+        if (request != summaryRequest || state.value.car?.id != id) return
         mutableState.update {
             it.copy(
                 summary = result.getOrNull(),

@@ -7,6 +7,8 @@ import com.google.gson.JsonParseException
 import com.google.gson.JsonParser
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -39,6 +41,8 @@ internal class NetworkCarRepository(
     override val isDemo = false
     private val sessionMutex = Mutex()
     private val mirrorMutex = Mutex()
+    private val sessionRejected = MutableStateFlow(false)
+    override val requiresNewSession = sessionRejected.asStateFlow()
 
     override suspend fun restartSession() {
         mirrorMutex.withLock {
@@ -47,6 +51,7 @@ internal class NetworkCarRepository(
                     val oldToken = storedToken()
                     val newToken = createAndStoreToken(service)
                     if (oldToken != null && oldToken != newToken) mirror?.clear("Bearer " + oldToken)
+                    sessionRejected.value = false
                 }
             }
         }
@@ -173,7 +178,14 @@ internal class NetworkCarRepository(
     private suspend fun <T> authorized(call: suspend (ProfitApi, String) -> T): T =
         apiCall { service ->
             val token = sessionMutex.withLock { storedToken() ?: createAndStoreToken(service) }
-            call(service, "Bearer " + token)
+            try {
+                call(service, "Bearer " + token)
+            } catch (error: HttpException) {
+                if (error.code() == 401) sessionMutex.withLock {
+                    if (storedToken() == token) sessionRejected.value = true
+                }
+                throw error
+            }
         }
 
     private suspend fun <T> apiCall(call: suspend (ProfitApi) -> T): T =

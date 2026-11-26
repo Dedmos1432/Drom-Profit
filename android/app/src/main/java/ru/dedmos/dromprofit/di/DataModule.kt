@@ -8,6 +8,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import ru.dedmos.dromprofit.data.local.ProfitDatabase
+import ru.dedmos.dromprofit.data.local.SelectionIdsStore
+import ru.dedmos.dromprofit.domain.usecases.comparison.RememberComparisonUseCase
 import ru.dedmos.dromprofit.domain.usecases.detail.CarDetailUseCases
 import ru.dedmos.dromprofit.domain.repository.CarRepository
 import ru.dedmos.dromprofit.domain.usecases.comparison.CompareCarsUseCase
@@ -36,6 +38,11 @@ object DataModule {
 
     @Provides
     fun provideCompareCars(repository: CarRepository) = CompareCarsUseCase(repository)
+
+    @Provides
+    @Singleton
+    internal fun provideRememberComparison(@ApplicationContext context: Context): RememberComparisonUseCase =
+        RememberComparisonUseCase(SelectionIdsStore(context))
 
     @Provides
     fun provideRestartSession(repository: CarRepository) = RestartSessionUseCase(repository)

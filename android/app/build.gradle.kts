@@ -8,7 +8,13 @@ plugins {
 }
 
 val dromProfitApiBaseUrl = providers.gradleProperty("dromProfitApiBaseUrl").orElse("").get().trim()
-val dromProfitDemoEmpty = providers.gradleProperty("dromProfitDemoEmpty").orElse("false").get().toBooleanStrict()
+val demoScenarioProperty = providers.gradleProperty("dromProfitDemoScenario").orNull
+val dromProfitDemoScenario = demoScenarioProperty ?: "empty"
+val dromProfitDemoEmpty = demoScenarioProperty == null &&
+    providers.gradleProperty("dromProfitDemoEmpty").orElse("false").get().toBooleanStrict()
+require(dromProfitDemoScenario in setOf("empty", "seeded", "showcase", "list-error")) {
+    "dromProfitDemoScenario должен быть empty, seeded, showcase или list-error."
+}
 if (dromProfitApiBaseUrl.isNotBlank()) {
     val endpoint = runCatching { URI(dromProfitApiBaseUrl) }.getOrNull()
     require(
@@ -34,6 +40,7 @@ android {
         versionName = "1.0"
 
         buildConfigField("String", "DROM_PROFIT_API_BASE_URL", "\"$dromProfitApiBaseUrl\"")
+        buildConfigField("String", "DROM_PROFIT_DEMO_SCENARIO", "\"$dromProfitDemoScenario\"")
         buildConfigField("boolean", "DROM_PROFIT_DEMO_EMPTY", dromProfitDemoEmpty.toString())
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
