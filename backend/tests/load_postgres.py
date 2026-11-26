@@ -57,7 +57,7 @@ class RequestFailed(Exception):
     pass
 
 
-def virtual_user(port, start, rounds):
+def virtual_user(port, start, rounds, photos):
     samples = defaultdict(list)
     statuses = Counter()
     errors = Counter()
@@ -92,6 +92,8 @@ def virtual_user(port, start, rounds):
             try:
                 token = call("POST", "/api/session", 201)["token"]
                 card = {"brand": "Demo", "model": "A", "price": 100000, "source": "manual"}
+                if photos:
+                    card["image_urls"] = photos
                 a = call("POST", "/api/cars", 201, card, token)["id"]
                 b = call("POST", "/api/cars", 201, card | {"price": 105000}, token)["id"]
                 path = f"/api/cars/{a}"
@@ -100,6 +102,10 @@ def virtual_user(port, start, rounds):
                 flags = {"expenses_reviewed": True, "benefits_reviewed": True}
                 call("PATCH", path, 200, flags, token)
                 call("PATCH", f"/api/cars/{b}", 200, flags, token)
+                if photos:
+                    detail = call("GET", path, 200, token=token)
+                    if detail["image_urls"] != photos or detail["image_url"] != photos[0]:
+                        errors["invalid_gallery"] += 1
                 result = call("GET", path + "/summary", 200, token=token)
                 comparison = call("POST", "/api/comparison", 200, {"car_ids": [a, b]}, token)
                 if (result["adjusted_cost"] != 106000 or comparison["provisional"]
@@ -114,12 +120,12 @@ def virtual_user(port, start, rounds):
     return samples, statuses, errors, completed
 
 
-def run_wave(http_server, sql_engine, users, rounds, wave):
+def run_wave(http_server, sql_engine, users, rounds, wave, photos):
     http_port, engine, probe = http_server
     probe.reset()
     start = Barrier(users + 1)
     with ThreadPoolExecutor(max_workers=users) as pool:
-        futures = [pool.submit(virtual_user, http_port, start, rounds) for _ in range(users)]
+        futures = [pool.submit(virtual_user, http_port, start, rounds, photos) for _ in range(users)]
         begin = time.perf_counter()
         cpu_start = time.process_time()
         start.wait(timeout=30)
@@ -141,6 +147,7 @@ def run_wave(http_server, sql_engine, users, rounds, wave):
     report = probe.report(engine, sql_engine)
     print(json.dumps({
         "users": users, "rounds_per_user": rounds, "wave": wave,
+        "photos_per_car": len(photos),
         "workflows_completed": completed, "requests": timings["count"],
         "seconds": elapsed, "requests_per_second": timings["count"] / elapsed,
         "p50_ms": timings["p50_ms"], "p95_ms": timings["p95_ms"],
@@ -174,9 +181,13 @@ def run_wave(http_server, sql_engine, users, rounds, wave):
 def test_load(http_server, sql_engine, users):
     rounds = int(os.environ.get("DROM_LOAD_ROUNDS", "5"))
     waves = int(os.environ.get("DROM_LOAD_WAVES", "1"))
+    photo_count = int(os.environ.get("DROM_LOAD_GALLERY_PHOTOS", "0"))
     if not (1 <= users <= 150 and 1 <= rounds <= 20 and 1 <= waves <= 10):
         pytest.fail("Local load requires 1–150 clients, 1–20 rounds and 1–10 waves")
+    if not 0 <= photo_count <= 64:
+        pytest.fail("A gallery must contain 0–64 synthetic URLs")
+    photos = [f"https://images.example.test/gallery/{index}.jpg" for index in range(photo_count)]
     results = [
-        run_wave(http_server, sql_engine, users, rounds, wave) for wave in range(1, waves + 1)
+        run_wave(http_server, sql_engine, users, rounds, wave, photos) for wave in range(1, waves + 1)
     ]
     assert all(results)

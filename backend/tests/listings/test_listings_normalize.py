@@ -125,7 +125,7 @@ def test_normalize_listing_fills_missing_with_null():
     assert list(data) == [
         "source", "listing_id", "brand", "model", "year", "price", "mileage_km", "trim",
         "fuel_type", "engine_volume_l", "power_hp", "transmission", "drive_type", "city",
-        "image_url", "listing_url", "market_valuation", "fetched_at",
+        "image_url", "image_urls", "listing_url", "market_valuation", "fetched_at",
     ]
     assert data["brand"] == "Toyota"
     assert data["price"] == 1200000

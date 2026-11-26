@@ -10,6 +10,7 @@ from dataclasses import asdict, dataclass, fields
 from datetime import datetime
 from typing import Any, Literal
 
+from ...formats import IMAGE_COUNT_LIMIT, validate_image_reference
 from ...money import MONEY_LIMIT
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,7 @@ class ListingData:
     drive_type: str | None = None
     city: str | None = None
     image_url: str | None = None
+    image_urls: tuple[str, ...] = ()
     listing_url: str | None = None
     market_valuation: int | None = None
     fetched_at: str | None = None
@@ -74,10 +76,17 @@ class ListingData:
         volume = self.engine_volume_l
         if volume is not None and (type(volume) not in (int, float) or not 0 <= volume < 100):
             raise ValueError("engine_volume_l: ожидается число литров >= 0")
-        for name in ("image_url", "listing_url"):
-            value = getattr(self, name)
-            if value is not None and not value.startswith("https://"):
-                raise ValueError(f"{name}: ожидается https URL")
+        if self.listing_url is not None and not self.listing_url.startswith("https://"):
+            raise ValueError("listing_url: ожидается https URL")
+        if isinstance(self.image_urls, (str, bytes)) or len(self.image_urls) > IMAGE_COUNT_LIMIT:
+            raise ValueError("image_urls: недопустимый список фотографий")
+        photos = tuple(dict.fromkeys(validate_image_reference(url) for url in self.image_urls))
+        if not photos and self.image_url is not None:
+            photos = (validate_image_reference(self.image_url),)
+        if photos and self.image_url not in (None, photos[0]):
+            raise ValueError("image_url должен совпадать с первой фотографией")
+        object.__setattr__(self, "image_urls", photos)
+        object.__setattr__(self, "image_url", photos[0] if photos else None)
         if self.fetched_at is not None:
             try:
                 parsed = datetime.fromisoformat(self.fetched_at)
@@ -87,14 +96,14 @@ class ListingData:
                 raise ValueError("fetched_at: требуется часовой пояс")
 
     def as_dict(self) -> dict[str, Any]:
-        """JSON-совместимый словарь со всеми 18 полями контракта в порядке схемы."""
-        return asdict(self)
+        """JSON-совместимый словарь публичного предпросмотра."""
+        return asdict(self) | {"image_urls": list(self.image_urls)}
 
     @classmethod
     def from_dict(cls, row: dict[str, Any]) -> "ListingData":
         """Строгое создание из словаря: лишние или пропущенные ключи — ошибка."""
         names = {field.name for field in fields(cls)}
-        if set(row) != names:
+        if set(row) | {"image_urls"} != names:
             extra, missing = set(row) - names, names - set(row)
             raise ValueError(f"Неверный набор полей: лишние {sorted(extra)}, нет {sorted(missing)}")
         return cls(**row)

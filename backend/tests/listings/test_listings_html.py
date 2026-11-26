@@ -99,6 +99,7 @@ def test_drom_provider_end_to_end_without_network():
         "drive_type": "Передний",
         "city": "Владивосток",
         "image_url": "https://img.example.test/main.jpg",
+        "image_urls": ["https://img.example.test/main.jpg", "https://img.example.test/2.jpg"],
         "listing_url": URL,
         "market_valuation": None,
         "fetched_at": None,
@@ -245,8 +246,10 @@ def test_public_result_skips_invalid_first_image_and_uses_relative_candidate():
     )
     public = asyncio.run(provider.fetch(URL)).as_dict()
     assert public["image_url"] == "https://vladivostok.drom.ru/gallery/main.jpg"
-    assert len(public) == 18
-    assert "image_urls" not in public
+    assert len(public) == 19
+    assert public["image_urls"] == [
+        "https://vladivostok.drom.ru/gallery/main.jpg", "https://img.example.test/second.jpg",
+    ]
 
 
 def test_image_candidates_are_unique_in_source_order():
@@ -276,6 +279,10 @@ def test_og_image_is_a_fallback_and_absence_is_allowed(metas, expected):
         target=TARGET,
     )
     assert raw["image_url"] == expected
+    assert listing_from_html(
+        metas + page({"@type": "Car", "sku": TARGET.listing_id, "image": ["data:invalid"],
+                      "brand": "Demo", "model": "Model"}), TARGET,
+    ).as_dict()["image_urls"] == ([expected] if expected else [])
 
 
 
@@ -323,7 +330,7 @@ def test_matches_explicit_offer_and_reads_only_the_bulletin_markup():
         "https://vladivostok.drom.ru/gallery/one.jpg",
         "https://vladivostok.drom.ru/gallery/two.jpg",
     )
-    assert "image_urls" not in listing.as_dict()
+    assert listing.as_dict()["image_urls"] == list(raw["image_urls"])
 
 
 def test_matching_offer_cannot_overrule_an_explicitly_mismatched_vehicle():

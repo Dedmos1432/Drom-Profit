@@ -4,6 +4,24 @@
   min-inline-size: 0;
 }
 
+.frame {
+  position: relative;
+  min-inline-size: 0;
+}
+
+.navigation {
+  position: absolute;
+  inset: 50% var(--dp-spacing-small) auto;
+  translate: 0 -50%;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.navigation button {
+  pointer-events: auto;
+}
+
 .main:not([data-photo-placeholder]) {
   object-fit: contain;
   background: var(--dp-color-semantic-background-panel);

@@ -1,9 +1,11 @@
 from uuid import uuid4
 
-from sqlalchemy import BigInteger, CheckConstraint, Double, ForeignKey, String, UniqueConstraint
+from sqlalchemy import BigInteger, CheckConstraint, Double, ForeignKey, String, UniqueConstraint, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
+from .formats import IMAGE_COUNT_LIMIT
 from .money import MONEY_LIMIT
 
 
@@ -26,6 +28,11 @@ class Car(Base):
         CheckConstraint(
             f"market_valuation BETWEEN 1 AND {MONEY_LIMIT}", name="ck_cars_market_valuation_money"
         ),
+        CheckConstraint(
+            f"cardinality(image_urls) <= {IMAGE_COUNT_LIMIT} AND "
+            "array_position(image_urls, NULL) IS NULL AND image_url IS NOT DISTINCT FROM image_urls[1]",
+            name="ck_cars_gallery",
+        ),
     )
 
     id: Mapped[str] = mapped_column(primary_key=True, default=lambda: str(uuid4()))
@@ -45,6 +52,9 @@ class Car(Base):
     drive_type: Mapped[str | None]
     city: Mapped[str | None]
     image_url: Mapped[str | None]
+    image_urls: Mapped[list[str]] = mapped_column(
+        ARRAY(String()), server_default=text("'{}'::varchar[]"), deferred=True,
+    )
     listing_url: Mapped[str | None]
     market_valuation: Mapped[int | None]
     fetched_at: Mapped[str | None]

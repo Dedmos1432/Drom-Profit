@@ -17,6 +17,7 @@ from decimal import Decimal
 from typing import Any
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
+from ...formats import IMAGE_COUNT_LIMIT, IMAGE_URL_LIMIT, validate_image_reference
 from ...money import MONEY_LIMIT
 from .errors import ListingImportError
 from .models import ListingData, ListingSource
@@ -216,7 +217,7 @@ def https_url(value: Any, *, page_url: str | None = None) -> str | None:
     """Проверяет ссылку для передачи клиенту. Относительные адреса остаются на хосте страницы."""
     text = value.strip() if isinstance(value, str) else ""
     if (
-        not text or len(text) > 2048 or not text.isascii() or "\\" in text
+        not text or len(text) > IMAGE_URL_LIMIT or not text.isascii() or "\\" in text
         or any(ch.isspace() or not 0x21 <= ord(ch) < 0x7F for ch in text)
     ):
         return None
@@ -234,7 +235,7 @@ def https_url(value: Any, *, page_url: str | None = None) -> str | None:
             or not re.fullmatch(r"[a-z0-9-]+(?:\.[a-z0-9-]+)+", parts.hostname)
         ):
             return None
-        return urlunsplit(parts._replace(netloc=parts.hostname, fragment=""))
+        return validate_image_reference(urlunsplit(parts._replace(netloc=parts.hostname, fragment="")))
     except ValueError:
         return None
 
@@ -259,6 +260,10 @@ def normalize_listing(
     price = parse_price(raw.get("price"))
     if raw.get("_price_invalid") or (raw.get("price") is not None and price is None):
         raise ListingImportError("parse_error", "некорректная цена объявления в рублях")
+    candidates = raw.get("image_urls")
+    photos = tuple(dict.fromkeys(
+        url for value in candidates if (url := https_url(value))
+    )) if isinstance(candidates, (tuple, list)) else ()
     return ListingData(
         source=source,
         listing_id=clean_text(str(raw_id) if type(raw_id) is int else raw_id) or listing_id,
@@ -274,7 +279,8 @@ def normalize_listing(
         transmission=normalize_transmission(raw.get("transmission")),
         drive_type=normalize_drive(raw.get("drive_type")),
         city=clean_text(raw.get("city"), 80),
-        image_url=https_url(raw.get("image_url")),
+        image_url=photos[0] if photos else https_url(raw.get("image_url")),
+        image_urls=photos[:IMAGE_COUNT_LIMIT],
         listing_url=listing_url,
         market_valuation=parse_market_valuation(raw.get("market_valuation")),
         fetched_at=fetched_at,

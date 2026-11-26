@@ -2,7 +2,8 @@ import { http, HttpResponse } from 'msw';
 import { z } from 'zod';
 import listings from '../../../shared/fixtures/import-listings.json';
 import type { Comparison } from '@/entities/comparison/api';
-import type { Car, Listing, Summary } from '@/entities/vehicle/api';
+import type { Car, CarDetail, Listing, Summary } from '@/entities/vehicle/api';
+import { carWithoutGallery } from '@/entities/vehicle/photos';
 import { canonicalDemoListingUrl, carInputSchema } from '@/entities/vehicle/validation';
 import { apiUrl } from '@/shared/api/client';
 import type { components } from '@/shared/api/schema';
@@ -16,7 +17,7 @@ import { vehicleWriteHandlers } from './vehicle-writes';
 
 type ContractError = components['schemas']['Error'];
 type Session = components['schemas']['Session'];
-type Payload = ContractError | Car | Car[] | Listing | Session | Summary | Comparison;
+type Payload = ContractError | Car | Car[] | CarDetail | Listing | Session | Summary | Comparison;
 
 function response(body: Payload, status = 200) {
   return HttpResponse.json<Payload>(body, { status });
@@ -65,7 +66,7 @@ export function handlers(config: AppConfig, storage: Storage, locks?: LockManage
     return token && cars ? { token, cars } : null;
   }
 
-  async function mutateCar(request: Request, id: string, apply: (car: Car) => Response) {
+  async function mutateCar(request: Request, id: string, apply: (car: CarDetail) => Response) {
     const session = sessionFor(request);
     if (!session) return unauthorized();
     const result = await store.mutateCar(session.token, id, apply);
@@ -89,7 +90,7 @@ export function handlers(config: AppConfig, storage: Storage, locks?: LockManage
         failNextList = false;
         return error(500, 'mock_list_error', 'Не удалось загрузить выборку.');
       }
-      return response(session.cars);
+      return response(session.cars.map(carWithoutGallery));
     }),
     http.post(url('/api/cars/import'), async ({ request }) => {
       if (!sessionFor(request)) return unauthorized();
@@ -102,7 +103,7 @@ export function handlers(config: AppConfig, storage: Storage, locks?: LockManage
       if (failure) return failure();
       const listing =
         (listings as Listing[]).find((item) => item.listing_url === lookup) ??
-        findShowcaseListing(lookup, config.baseUrl);
+        findShowcaseListing(lookup);
       return listing ? response(listing) : unavailable();
     }),
     http.post(url('/api/cars'), async ({ request }) => {
@@ -112,7 +113,7 @@ export function handlers(config: AppConfig, storage: Storage, locks?: LockManage
       if (!parsed.success)
         return moneyValidationError(parsed.error, 'Проверьте характеристики автомобиля.');
       const created = await store.add(session.token, parsed.data);
-      return created ? response(created, 201) : unauthorized();
+      return created ? response(carWithoutGallery(created), 201) : unauthorized();
     }),
     http.get(url('/api/cars/:carId/summary'), ({ params, request }) => {
       const session = sessionFor(request);

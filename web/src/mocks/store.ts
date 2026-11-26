@@ -1,21 +1,14 @@
 import fixtures from '../../../shared/fixtures/demo-cars.json';
-import type { Car, CarInput } from '@/entities/vehicle/api';
+import listings from '../../../shared/fixtures/import-listings.json';
+import type { Car, CarDetail, CarInput } from '@/entities/vehicle/api';
+import { photosAfterWrite, readGallery } from '@/entities/vehicle/photos';
 import type { AppConfig } from '@/shared/config/env';
-import { demoPhotoUrl } from '@/entities/vehicle/showcase-photos';
 import { showcaseCars } from './showcase';
 
-const seedPhotos: Record<string, string> = {
-  'car-1': 'camry-xv50-silver.jpg',
-  'car-2': 'camry-xv50-white.jpg',
-  'car-3': 'camry-xv50-silver.jpg',
-};
-
-function seededCars(baseUrl: string): Car[] {
+function seededCars(): CarDetail[] {
   return (fixtures as Car[]).map((car) => {
-    const photo = seedPhotos[car.id];
-    return photo && car.source === 'demo' && car.image_url === null
-      ? { ...car, image_url: demoPhotoUrl(photo, baseUrl) }
-      : car;
+    const listing = listings.find(({ listing_id }) => listing_id === car.listing_id);
+    return { ...car, ...readGallery(listing ?? car) };
   });
 }
 
@@ -28,16 +21,17 @@ export function createMockStore(
   const keyFor = (token: string) =>
     ['drom-profit.mock-db.v1', config.scenario, scope, token].join('.');
 
-  function list(token: string): Car[] | null {
+  function list(token: string): CarDetail[] | null {
     const data = storage.getItem(keyFor(token));
-    return data ? (JSON.parse(data) as Car[]) : null;
+    if (!data) return null;
+    return (JSON.parse(data) as CarDetail[]).map((car) => ({ ...car, ...readGallery(car) }));
   }
 
-  function save(token: string, cars: Car[]) {
+  function save(token: string, cars: CarDetail[]) {
     storage.setItem(keyFor(token), JSON.stringify(cars));
   }
 
-  function transact<T>(token: string, mutate: (cars: Car[]) => T) {
+  function transact<T>(token: string, mutate: (cars: CarDetail[]) => T) {
     const update = () => {
       const cars = list(token);
       if (!cars) return null;
@@ -53,15 +47,15 @@ export function createMockStore(
       const token = 'drom-demo-' + crypto.randomUUID();
       const cars =
         config.scenario === 'showcase'
-          ? showcaseCars(config.baseUrl)
+          ? showcaseCars()
           : config.scenario === 'seeded'
-            ? seededCars(config.baseUrl)
+            ? seededCars()
             : [];
       save(token, cars);
       return token;
     },
     list,
-    mutateCar<T>(token: string, id: string, change: (car: Car) => T) {
+    mutateCar<T>(token: string, id: string, change: (car: CarDetail) => T) {
       return transact(token, (cars) => {
         const car = cars.find((candidate) => candidate.id === id);
         return car ? change(car) : undefined;
@@ -69,7 +63,8 @@ export function createMockStore(
     },
     add(token: string, input: CarInput) {
       return transact(token, (cars) => {
-        const car: Car = {
+        const image_urls = photosAfterWrite(input);
+        const car: CarDetail = {
           id: crypto.randomUUID(),
           source: input.source,
           brand: input.brand,
@@ -86,7 +81,8 @@ export function createMockStore(
           transmission: input.transmission ?? null,
           drive_type: input.drive_type ?? null,
           city: input.city ?? null,
-          image_url: input.image_url ?? null,
+          image_url: image_urls[0] ?? null,
+          image_urls,
           listing_url: input.listing_url ?? null,
           market_valuation: input.market_valuation ?? null,
           expenses_reviewed: false,

@@ -24,7 +24,8 @@ def one_connection(monkeypatch):
 
 
 def test_read_responses_release_the_snapshot_before_validation(client, new_car, headers, monkeypatch):
-    first, second = new_car(), new_car()
+    photos = [f"https://images.example.test/gallery/{index}.jpg" for index in range(28)]
+    first, second = new_car(image_urls=photos), new_car()
     original = fastapi.routing.serialize_response
     engine = client.app.state.engine
 
@@ -33,8 +34,10 @@ def test_read_responses_release_the_snapshot_before_validation(client, new_car, 
         return await original(*args, **kwargs)
 
     monkeypatch.setattr(fastapi.routing, "serialize_response", serialize)
-    for path in ("/api/cars", first, first + "/summary"):
+    for path in ("/api/cars", first + "/summary"):
         assert client.get(path, headers=headers).status_code == 200
+    detail = client.get(first, headers=headers)
+    assert detail.status_code == 200 and detail.json()["image_urls"] == photos
     ids = [path.rsplit("/", 1)[-1] for path in (first, second)]
     assert client.post("/api/comparison", headers=headers, json={"car_ids": ids}).status_code == 200
 

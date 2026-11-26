@@ -1,8 +1,7 @@
 import { Link as RouterLink, useLocation, useParams } from 'react-router';
 import { useEffect, useState } from 'react';
-import { useSession } from '@/entities/session/SessionBoundary';
 import { useCar, useCarSummary } from '@/entities/vehicle/api';
-import type { Car } from '@/entities/vehicle/api';
+import type { CarDetail } from '@/entities/vehicle/api';
 import {
   engine,
   mileage,
@@ -10,7 +9,7 @@ import {
   sourceLabel,
   vehicleName,
 } from '@/entities/vehicle/presentation';
-import { vehicleGalleryImages } from '@/entities/vehicle/showcase-photos';
+import { isDemoPhoto, vehicleGalleryImages } from '@/entities/vehicle/photos';
 import { VehicleGallery } from '@/entities/vehicle/VehicleGallery';
 import { EditVehicleDialog } from '@/features/edit-vehicle/EditVehicleDialog';
 import { ApiError } from '@/shared/api/client';
@@ -86,18 +85,17 @@ function VehicleDetails({
   failed,
   retry,
 }: {
-  car: Car;
+  car: CarDetail;
   reviewAvailable: boolean;
   failed: boolean;
   retry: () => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const { config } = useSession();
   const summary = useCarSummary(car.id);
   const { hash } = useLocation();
   const name = vehicleName(car);
   const original = originalListing(car);
-  const images = vehicleGalleryImages(car, config.mode === 'mock' ? config.baseUrl : undefined);
+  const images = vehicleGalleryImages(car);
 
   useEffect(() => {
     const target = hash.slice(1);
@@ -126,7 +124,10 @@ function VehicleDetails({
         />
       )}
       <div className={styles.details}>
-        <VehicleGallery images={images} modelPhotos={images.length > 1} />
+        <VehicleGallery
+          images={images}
+          modelPhotos={car.source === 'demo' && isDemoPhoto(car.image_url)}
+        />
         <Stack className={styles.description} gap="roomy">
           <Stack gap="tight">
             <PageHeader title={name} />

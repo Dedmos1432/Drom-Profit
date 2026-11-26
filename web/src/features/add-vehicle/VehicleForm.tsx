@@ -3,6 +3,7 @@ import type { HTMLAttributes } from 'react';
 import { useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import type { Car, CarInput, CarPatch, Listing } from '@/entities/vehicle/api';
+import { photosAfterWrite } from '@/entities/vehicle/photos';
 import { carFormSchema } from '@/entities/vehicle/validation';
 import type { CarFormValues, ValidCarForm } from '@/entities/vehicle/validation';
 import { ApiError } from '@/shared/api/client';
@@ -100,8 +101,10 @@ export function VehicleForm(props: VehicleFormProps) {
           if (props.car) {
             await props.onSave(changedFields(baseline ?? props.car, values));
           } else {
+            const image_urls = photosAfterWrite(values, listing?.image_urls);
             await props.onSave({
               ...values,
+              image_urls,
               source: listing?.source ?? 'manual',
               listing_id: listing?.listing_id ?? null,
               fetched_at: listing?.fetched_at ?? null,

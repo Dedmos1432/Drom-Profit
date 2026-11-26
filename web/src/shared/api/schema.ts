@@ -238,8 +238,10 @@ export interface components {
             transmission: string | null;
             drive_type: string | null;
             city: string | null;
-            /** Format: uri */
+            /** @description Первая фотография. HTTPS-ссылка или путь к локальному JPG из /demo/vehicles/. */
             image_url: string | null;
+            /** @description Ссылки в порядке источника. Первый элемент совпадает с image_url. Пустой массив означает отсутствие фотографий. */
+            image_urls: string[];
             /** Format: uri */
             listing_url: string | null;
             /**
@@ -270,8 +272,10 @@ export interface components {
             transmission?: string | null;
             drive_type?: string | null;
             city?: string | null;
-            /** Format: uri */
+            /** @description Первая фотография. HTTPS-ссылка или путь к локальному JPG из /demo/vehicles/. */
             image_url?: string | null;
+            /** @description Ссылки в порядке источника. Первый элемент совпадает с image_url. Пустой массив означает отсутствие фотографий. */
+            image_urls?: string[];
             /** Format: uri */
             listing_url?: string | null;
             /**
@@ -299,8 +303,10 @@ export interface components {
             transmission?: string | null;
             drive_type?: string | null;
             city?: string | null;
-            /** Format: uri */
+            /** @description Первая фотография. HTTPS-ссылка или путь к локальному JPG из /demo/vehicles/. */
             image_url?: string | null;
+            /** @description Ссылки в порядке источника. Первый элемент совпадает с image_url. Пустой массив означает отсутствие фотографий. */
+            image_urls?: string[];
             /** Format: uri */
             listing_url?: string | null;
             /**
@@ -473,8 +479,48 @@ export interface components {
             transmission: string | null;
             drive_type: string | null;
             city: string | null;
-            /** Format: uri */
+            /** @description Первая фотография. HTTPS-ссылка или путь к локальному JPG из /demo/vehicles/. */
             image_url: string | null;
+            /** Format: uri */
+            listing_url: string | null;
+            /**
+             * Format: int64
+             * @description Целые рубли. Только целочисленный JSON-литерал в десятичной записи без дроби, экспоненты и кавычек. -0 эквивалентен 0.
+             */
+            market_valuation: number | null;
+            /** Format: date-time */
+            fetched_at: string | null;
+            id: string;
+            expenses_reviewed: boolean;
+            benefits_reviewed: boolean;
+            expenses: components["schemas"]["Expense"][];
+            benefits: components["schemas"]["Benefit"][];
+            notes: components["schemas"]["Note"][];
+        };
+        CarDetail: {
+            /** @enum {string} */
+            source: "drom" | "demo" | "manual";
+            listing_id: string | null;
+            brand: string;
+            model: string;
+            year: number | null;
+            /**
+             * Format: int64
+             * @description Целые рубли. Только целочисленный JSON-литерал в десятичной записи без дроби, экспоненты и кавычек. -0 эквивалентен 0.
+             */
+            price: number;
+            mileage_km: number | null;
+            trim: string | null;
+            fuel_type: string | null;
+            engine_volume_l: number | null;
+            power_hp: number | null;
+            transmission: string | null;
+            drive_type: string | null;
+            city: string | null;
+            /** @description Первая фотография. HTTPS-ссылка или путь к локальному JPG из /demo/vehicles/. */
+            image_url: string | null;
+            /** @description Ссылки в порядке источника. Первый элемент совпадает с image_url. Пустой массив означает отсутствие фотографий. */
+            image_urls: string[];
             /** Format: uri */
             listing_url: string | null;
             /**
@@ -763,7 +809,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Car"];
+                    "application/json": components["schemas"]["CarDetail"];
                 };
             };
             /** @description Error */

@@ -14,7 +14,6 @@ export function useSaveVehicle() {
       queryClient.setQueryData<Car[]>(vehicleKeys.list, (cars) =>
         cars ? [car, ...cars.filter(({ id }) => id !== car.id)] : undefined,
       );
-      queryClient.setQueryData(vehicleKeys.detail(car.id), car);
       await queryClient.invalidateQueries({ queryKey: vehicleKeys.list, exact: true });
     },
   });

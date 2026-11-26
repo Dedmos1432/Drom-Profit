@@ -32,8 +32,10 @@ def test_nonblank_fields_on_create_and_patch(client, headers, new_car):
     ("fetched_at", "2025-02-29T00:00:00Z", "2016-12-31T23:59:60Z"),
     ("fetched_at", "2025-02-28T00:00:00", "2025-02-28T00:00:00-00:00"),
     ("listing_url", "https://example.invalid/a b", "https://example.invalid/a%20b"),
-    ("image_url", "relative/path", "urn:example:photo"),
-    ("image_url", "https://example.invalid/%xx", "https://[::1]/a?x=y#f"),
+    ("image_url", "relative/path", "/demo/vehicles/camry-xv50.jpg"),
+    ("image_url", "https://example.invalid/%xx", "https://example.invalid/a?x=y#f"),
+    ("image_url", "urn:example:photo", "https://example.invalid/photo.jpg"),
+    ("image_url", "https://[::1]/a?x=y#f", "https://example.invalid/photo.jpg"),
 ])
 def test_wire_formats(client, headers, field, bad, good):
     body = {"source": "manual", "brand": "A", "model": "B", "price": 1}
@@ -81,12 +83,17 @@ def test_previously_accepted_card_can_be_read_and_corrected(client, headers, new
     path = new_car()
     with sql_engine.begin() as connection:
         connection.execute(
-            text("UPDATE cars SET brand = :brand, listing_url = :url WHERE id = :id"),
+            text("""
+                UPDATE cars SET brand = :brand, listing_url = :url,
+                                image_url = 'urn:legacy:photo', image_urls = ARRAY['urn:legacy:photo']
+                WHERE id = :id
+            """),
             dict(brand=" ", url="https://example.invalid/%xx", id=path.rsplit("/", 1)[1]),
         )
     saved = client.get(path, headers=headers)
     assert saved.status_code == 200 and saved.json()["brand"] == " "
     assert saved.json()["listing_url"] is None
+    assert (saved.json()["image_url"], saved.json()["image_urls"]) == (None, [])
     assert client.get("/api/cars", headers=headers).status_code == 200
     corrected = client.patch(path, headers=headers, json={"brand": "Марка", "listing_url": None})
     assert corrected.status_code == 200 and corrected.json()["listing_url"] is None

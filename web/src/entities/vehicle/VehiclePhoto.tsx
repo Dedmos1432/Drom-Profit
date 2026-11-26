@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { classes } from '@/shared/lib/classes';
 import { ImagePlaceholder } from '@/shared/ui';
-import { safeWebUrl } from './presentation';
+import { imageSrc } from './photos';
 import styles from './VehiclePhoto.module.css';
 
 export function VehiclePhoto({
@@ -15,7 +15,7 @@ export function VehiclePhoto({
   alt?: string;
   onUnavailable?: (url: string) => void;
 }) {
-  const url = safeWebUrl(value);
+  const url = imageSrc(value);
   const [failed, setFailed] = useState<string | null>(null);
 
   return url && failed !== url ? (
@@ -26,7 +26,7 @@ export function VehiclePhoto({
       loading="lazy"
       onError={() => {
         setFailed(url);
-        onUnavailable?.(url);
+        onUnavailable?.(value ?? url);
       }}
     />
   ) : (

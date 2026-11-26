@@ -41,7 +41,7 @@ def test_default_demo_preview_and_edited_save(client, headers, new_session, expe
     assert response.status_code == 200
     preview = response.json()
     required = client.app.openapi()["components"]["schemas"]["ListingData"]["required"]
-    assert len(required) == 18
+    assert len(required) == 19
     assert set(preview) == set(required)
     assert preview == expected
     assert client.get(CARS, headers=headers).json() == []
@@ -50,9 +50,11 @@ def test_default_demo_preview_and_edited_save(client, headers, new_session, expe
     saved = client.post(CARS, headers=headers, json=edited)
     assert saved.status_code == 201, saved.text
     car = saved.json()
-    assert {field: car[field] for field in required} == edited
+    assert "image_urls" not in car
     path = f"{CARS}/{car['id']}"
-    assert client.get(path, headers=headers).json() == car
+    detail = client.get(path, headers=headers).json()
+    assert {field: detail[field] for field in required} == edited
+    assert detail == car | {"image_urls": edited["image_urls"]}
     guest = new_session()
     assert client.get(CARS, headers=guest).json() == []
     assert_error(client.get(path, headers=guest), 404, "not_found")
@@ -115,12 +117,16 @@ def test_parser_error_translation(db_url, monkeypatch, code, status):
 
 
 @pytest.mark.parametrize(
-    "data", [None, ParserListingData(source="demo", image_url="https://example.invalid/invalid URI")],
+    "data", [None, "https://example.invalid/invalid URI"],
     ids=["wrong-result-type", "invalid-core-field"],
 )
 def test_invalid_parser_result_is_502(db_url, monkeypatch, data):
     async def parser(_url):
-        return data
+        if data is None:
+            return None
+        listing = ParserListingData(source="demo")
+        object.__setattr__(listing, "image_urls", (data,))
+        return listing
 
     monkeypatch.setattr(listing_import, "importer_from_env", lambda: parser)
     with TestClient(create_app(db_url)) as client:
@@ -262,11 +268,13 @@ def test_configured_drom_source_through_core_adapter(db_url, monkeypatch):
         preview = pending.result(timeout=5)
         assert preview.status_code == 200
         listing = preview.json()
-        assert len(listing) == 18
+        assert len(listing) == 19
         assert (listing["source"], listing["listing_id"], listing["price"]) == (
             "drom", "12345678", 1200000,
         )
         assert client.get(CARS, headers=headers).json() == []
+        assert listing["image_url"] == listing["image_urls"][0]
+        assert len(listing["image_urls"]) == 2
         saved = client.post(CARS, headers=headers, json=listing)
         assert saved.status_code == 201
         assert saved.json()["listing_url"] == url
@@ -282,7 +290,11 @@ def test_import_to_comparison_and_restart(db_url):
         assert [response.status_code for response in previews] == [200, 200]
         # This synthetic URL exercises persistence without requiring an image request.
         image_url = "https://example.invalid/inspection.jpg"
-        payloads = [previews[0].json() | {"image_url": image_url}, previews[1].json()]
+        gallery = [image_url, *previews[0].json()["image_urls"]]
+        payloads = [
+            previews[0].json() | {"image_url": image_url, "image_urls": gallery},
+            previews[1].json() | {"image_url": None, "image_urls": []},
+        ]
         saved = [client.post(CARS, headers=headers, json=payload) for payload in payloads]
         assert [response.status_code for response in saved] == [201, 201]
         first, second = [response.json() for response in saved]
@@ -304,7 +316,10 @@ def test_import_to_comparison_and_restart(db_url):
         assert cards.status_code == 200
         by_id = {car["id"]: car for car in cards.json()}
         assert by_id[first["id"]]["image_url"] == image_url
+        assert "image_urls" not in by_id[first["id"]]
         assert by_id[second["id"]]["image_url"] is None
+        assert client.get(path, headers=headers).json()["image_urls"] == gallery
+        assert client.get(f"{CARS}/{second['id']}", headers=headers).json()["image_urls"] == []
         for key in ("source", "listing_id", "listing_url", "fetched_at"):
             assert by_id[first["id"]][key] == first[key]
         summary = client.get(path + "/summary", headers=headers)

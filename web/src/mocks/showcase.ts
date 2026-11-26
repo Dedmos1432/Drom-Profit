@@ -1,9 +1,16 @@
-import type { Car, Listing } from '@/entities/vehicle/api';
+import demoListings from '../../../shared/fixtures/import-listings.json';
+import type { Car, CarDetail, Listing } from '@/entities/vehicle/api';
 import type { Benefit, Expense } from '@/entities/vehicle/records';
-import { demoPhotoUrl, showcasePhotos } from '@/entities/vehicle/showcase-photos';
+
+const showcasePhotos = {
+  '102': ['accord-ix.jpg', 'accord-ix-front.jpg', 'accord-ix-side.jpg'],
+  '103': ['mazda6-gj.jpg', 'mazda6-gj-rear.jpg', 'mazda6-gj-white.jpg'],
+  '104': ['x-trail-t32.jpg', 'x-trail-t32-rear.jpg', 'x-trail-t32-interior.jpg'],
+  '105': ['rav4-xa40.jpg', 'rav4-xa40-rear.jpg', 'rav4-xa40-interior.jpg'],
+} as const;
 
 type ShowcaseVehicle = {
-  listingId: keyof typeof showcasePhotos;
+  listingId: '101' | keyof typeof showcasePhotos;
   specs: Pick<
     Car,
     | 'brand'
@@ -196,26 +203,31 @@ const showcase: readonly ShowcaseVehicle[] = [
 
 const listingUrl = (id: string) => 'https://auto.drom.ru/demo/' + id + '.html';
 
-function listingData({ listingId, specs }: ShowcaseVehicle, baseUrl: string) {
+function listingData({ listingId, specs }: ShowcaseVehicle) {
+  const image_urls =
+    listingId === '101'
+      ? (demoListings.find(({ listing_id }) => listing_id === 'demo-001')?.image_urls ?? [])
+      : showcasePhotos[listingId].map((file) => '/demo/vehicles/' + file);
   return {
     ...specs,
     source: 'demo',
     listing_id: listingId,
     listing_url: listingUrl(listingId),
-    image_url: demoPhotoUrl(showcasePhotos[listingId][0][0], baseUrl),
+    image_url: image_urls[0] ?? null,
+    image_urls,
     market_valuation: null,
     fetched_at: null,
   } satisfies Listing;
 }
 
-export function findShowcaseListing(url: string, baseUrl: string): Listing | undefined {
+export function findShowcaseListing(url: string): Listing | undefined {
   const vehicle = showcase.find(({ listingId }) => listingUrl(listingId) === url);
-  return vehicle && listingData(vehicle, baseUrl);
+  return vehicle && listingData(vehicle);
 }
 
-export function showcaseCars(baseUrl: string): Car[] {
+export function showcaseCars(): CarDetail[] {
   return showcase.map((vehicle) => ({
-    ...listingData(vehicle, baseUrl),
+    ...listingData(vehicle),
     ...vehicle.assessment,
     id: 'showcase-' + vehicle.listingId,
   }));

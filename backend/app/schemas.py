@@ -11,10 +11,13 @@ from pydantic import (
     StrictInt,
     ValidationError,
     field_validator,
+    model_validator,
 )
 from typing_extensions import TypedDict
 
-from .formats import validate_timestamp, validate_uri
+from .formats import (
+    IMAGE_COUNT_LIMIT, IMAGE_URL_LIMIT, validate_image_reference, validate_timestamp, validate_uri,
+)
 from .money import ADJUSTED_COST_MIN, COST_MAX, DIFFERENCE_MAX, MONEY_LIMIT
 
 
@@ -45,6 +48,12 @@ def require_nonblank(value: str) -> str:
 
 Nonblank = Annotated[Nonempty, AfterValidator(require_nonblank)]
 Uri = Annotated[str, Field(json_schema_extra={"format": "uri"}), AfterValidator(validate_uri)]
+ImageReference = Annotated[str, Field(max_length=IMAGE_URL_LIMIT), AfterValidator(validate_image_reference)]
+ImageReferences = Annotated[
+    list[ImageReference],
+    Field(max_length=IMAGE_COUNT_LIMIT),
+    AfterValidator(lambda values: list(dict.fromkeys(values))),
+]
 Timestamp = Annotated[
     str,
     BeforeValidator(lambda value: value.isoformat() if isinstance(value, datetime) else value),
@@ -55,6 +64,24 @@ Timestamp = Annotated[
 
 class Schema(BaseModel):
     model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+
+def check_photo_consistency(data):
+    if isinstance(data, dict) and "image_url" in data and isinstance(photos := data.get("image_urls"), list):
+        if data["image_url"] != (photos[0] if photos else None):
+            raise ValueError("image_url должен совпадать с первой фотографией")
+    return data
+
+
+def readable_image_references(values: list[str]) -> list[str]:
+    photos = []
+    for value in values:
+        try:
+            photos.append(validate_image_reference(value))
+        except ValueError:
+            # До 0.3.0 карточки могли хранить произвольные ссылки.
+            continue
+    return list(dict.fromkeys(photos))
 
 
 class ListingFields(Schema):
@@ -69,7 +96,7 @@ class ListingFields(Schema):
     transmission: str | None
     drive_type: str | None
     city: str | None
-    image_url: Uri | None
+    image_url: ImageReference | None
     listing_url: Uri | None
     market_valuation: Price | None
     fetched_at: Timestamp | None
@@ -79,6 +106,9 @@ class ListingData(ListingFields):
     brand: str | None
     model: str | None
     price: Price | None
+    image_urls: ImageReferences
+
+    _check_photos = model_validator(mode="before")(check_photo_consistency)
 
 
 class CarInput(ListingFields):
@@ -95,10 +125,13 @@ class CarInput(ListingFields):
     transmission: str | None = None
     drive_type: str | None = None
     city: str | None = None
-    image_url: Uri | None = None
+    image_url: ImageReference | None = None
+    image_urls: ImageReferences = Field(default_factory=list)
     listing_url: Uri | None = None
     market_valuation: Price | None = None
     fetched_at: Timestamp | None = None
+
+    _check_photos = model_validator(mode="before")(check_photo_consistency)
 
 
 class CarPatch(TypedDict, total=False):
@@ -116,11 +149,15 @@ class CarPatch(TypedDict, total=False):
     transmission: str | None
     drive_type: str | None
     city: str | None
-    image_url: Uri | None
+    image_url: ImageReference | None
+    image_urls: ImageReferences
     listing_url: Uri | None
     market_valuation: Price | None
     expenses_reviewed: StrictBool
     benefits_reviewed: StrictBool
+
+
+CheckedCarPatch = Annotated[CarPatch, BeforeValidator(check_photo_consistency)]
 
 
 class BenefitInput(Schema):
@@ -197,6 +234,20 @@ class Car(ListingFields):
             return handler(value)
         except ValidationError:
             return None
+
+
+class CarDetail(Car):
+    image_urls: ImageReferences
+
+    @field_validator("image_urls", mode="before")
+    @classmethod
+    def read_existing_gallery(cls, values):
+        return readable_image_references(values)
+
+    @model_validator(mode="after")
+    def set_main_photo(self):
+        self.image_url = self.image_urls[0] if self.image_urls else None
+        return self
 
 
 class Session(Schema):

@@ -58,7 +58,7 @@ def test_reviews_saved_redirect_and_compares_the_fields(tmp_path, monkeypatch):
     assert all(capture["replayed"] for capture in report["responses"])
     assert report["responses"][-1]["charset"] == "utf-8"
     rows = {row["field"]: row for row in report["fields"]}
-    assert len(rows) == 18
+    assert len(rows) == 19
     assert rows["listing_url"]["actual"] == URL
     assert rows["price"] == {
         "field": "price", "expected": 1200000, "actual": 1200000,

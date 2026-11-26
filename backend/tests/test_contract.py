@@ -32,7 +32,7 @@ def field_contract(field, *, money=False):
     return {
         key: value
         for key, value in field.items()
-        if key in {"$ref", "type", "items", "enum", "nullable", "minimum", "minLength", "minItems",
+        if key in {"$ref", "type", "items", "enum", "nullable", "minimum", "minLength", "maxLength", "minItems", "maxItems",
                    "uniqueItems", "format"} or (money and key == "maximum")
     }
 
@@ -149,11 +149,13 @@ def test_demo_preview_then_create(client, headers):
     assert preview.status_code == 200
     listing = preview.json()
     assert listing["source"] == "demo" and listing["listing_url"] == url
-    assert listing["image_url"] is None
+    assert listing["image_url"] == listing["image_urls"][0]
     assert client.get("/api/cars", headers=headers).json() == []
     saved = client.post("/api/cars", headers=headers, json=listing)
     assert saved.status_code == 201
-    assert all(saved.json()[key] == value for key, value in listing.items())
+    assert "image_urls" not in saved.json()
+    car = client.get("/api/cars/" + saved.json()["id"], headers=headers).json()
+    assert all(car[key] == value for key, value in listing.items())
 
 
 @pytest.mark.parametrize(

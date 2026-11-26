@@ -13,12 +13,33 @@ it('switches the main photo from the keyboard and reflects which thumbnail is se
   expect(screen.getByRole('img', { name: front.alt })).toHaveAttribute('src', front.url);
   expect(screen.getByRole('button', { name: front.alt })).toHaveAttribute('aria-pressed', 'true');
 
-  await user.tab();
+  screen.getByRole('button', { name: front.alt }).focus();
   await user.tab();
   await user.keyboard('{Enter}');
   expect(screen.getByRole('img', { name: rear.alt })).toHaveAttribute('src', rear.url);
   expect(screen.getByRole('button', { name: rear.alt })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByRole('button', { name: front.alt })).toHaveAttribute('aria-pressed', 'false');
+});
+
+it('navigates a long gallery and selects the first photo when the old selection disappears', async () => {
+  const user = userEvent.setup();
+  const images = Array.from({ length: 28 }, (_, index) => ({
+    url: `https://images.test/${index}.jpg`,
+    alt: `Фото ${index + 1}`,
+  }));
+  const { rerender } = render(<VehicleGallery images={images} />);
+  await user.click(screen.getByRole('button', { name: 'Предыдущее фото' }));
+  expect(screen.getByRole('img', { name: 'Фото 28' })).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Следующее фото' }));
+  const firstThumbnail = screen.getByRole('button', { name: 'Фото 1' });
+  expect(firstThumbnail).toHaveAttribute('aria-pressed', 'true');
+  firstThumbnail.focus();
+  await user.keyboard('{ArrowRight}');
+  expect(screen.getByRole('img', { name: 'Фото 2' })).toBeInTheDocument();
+
+  rerender(<VehicleGallery images={[rear]} />);
+  expect(screen.getByRole('img', { name: rear.alt })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Следующее фото' })).not.toBeInTheDocument();
 });
 
 it('uses another photo when one fails, and a placeholder when none are available', () => {

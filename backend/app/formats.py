@@ -20,6 +20,11 @@ _DATE_TIME = re.compile(
     r"(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?"
     r"(?:[Zz]|([+-])(\d{2}):(\d{2}))", re.ASCII
 )
+IMAGE_URL_LIMIT = 2048
+IMAGE_COUNT_LIMIT = 64
+_DEMO_PHOTO = re.compile(r"/demo/vehicles/[a-z0-9-]+\.jpg")
+_IMAGE_HOST = re.compile(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,62}", re.I)
+_LOCAL_SUFFIXES = (".localhost", ".local", ".localdomain", ".internal", ".lan", ".home.arpa")
 
 
 def validate_uri(value: str) -> str:
@@ -32,6 +37,17 @@ def validate_uri(value: str) -> str:
             raise ValueError("Недопустимый литерал IP")
         IPv6Address(literal)
     return value
+
+
+def validate_image_reference(value: str) -> str:
+    if len(value) <= IMAGE_URL_LIMIT:
+        if _DEMO_PHOTO.fullmatch(value):
+            return value
+        if value.startswith("https://"):
+            host = re.split(r"[/?#]", value[8:], maxsplit=1)[0]
+            if _IMAGE_HOST.fullmatch(host) and not host.lower().endswith(_LOCAL_SUFFIXES):
+                return validate_uri(value)
+    raise ValueError("Ожидается HTTPS-адрес фотографии или путь к демонстрационному JPG")
 
 
 def validate_timestamp(value: str) -> str:

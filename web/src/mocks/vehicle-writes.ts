@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import type { z } from 'zod';
-import type { Car } from '@/entities/vehicle/api';
+import type { Car, CarDetail } from '@/entities/vehicle/api';
+import { carWithoutGallery, MAX_PHOTOS, photosAfterWrite } from '@/entities/vehicle/photos';
 import type {
   Benefit,
   BenefitInput,
@@ -20,7 +21,11 @@ import { amountOutOfRange, moneyValidationError, readMoneyInput } from './money'
 import { changedFields } from '@/shared/lib/changed-fields';
 import type { components } from '@/shared/api/schema';
 
-type MutateCar = (request: Request, id: string, apply: (car: Car) => Response) => Promise<Response>;
+type MutateCar = (
+  request: Request,
+  id: string,
+  apply: (car: CarDetail) => Response,
+) => Promise<Response>;
 type Review = 'expenses_reviewed' | 'benefits_reviewed';
 
 function error(status: number, code: string, message: string) {
@@ -125,7 +130,15 @@ export function vehicleWriteHandlers(url: (path: string) => string, mutateCar: M
       return mutateCar(request, String(params.carId), (car) => {
         const parsed = carPatchSchema.safeParse(body);
         if (!parsed.success) return invalid(parsed.error);
-        const { expenses_reviewed, benefits_reviewed, ...fields } = parsed.data;
+        const { expenses_reviewed, benefits_reviewed, image_url, image_urls, ...fields } =
+          parsed.data;
+        if (image_url !== undefined || image_urls !== undefined) {
+          const photos = photosAfterWrite({ image_url, image_urls }, car.image_urls);
+          if (photos.length > MAX_PHOTOS)
+            return error(422, 'validation_error', 'Допустимо не более 64 фотографий');
+          car.image_urls = photos;
+          car.image_url = photos[0] ?? null;
+        }
         const changes = changedFields(car, fields);
         if (Object.keys(changes).length) {
           Object.assign(car, changes);
@@ -134,7 +147,7 @@ export function vehicleWriteHandlers(url: (path: string) => string, mutateCar: M
         }
         if (expenses_reviewed !== undefined) car.expenses_reviewed = expenses_reviewed;
         if (benefits_reviewed !== undefined) car.benefits_reviewed = benefits_reviewed;
-        return HttpResponse.json(car);
+        return HttpResponse.json(carWithoutGallery(car));
       });
     }),
     ...recordHandlers<Expense, ExpenseInput>(mutateCar, {

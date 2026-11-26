@@ -1,4 +1,5 @@
 import type { Car, Summary } from './api';
+import { isDemoPhoto } from './photos';
 
 const number = new Intl.NumberFormat('ru-RU');
 
@@ -42,8 +43,7 @@ export function safeWebUrl(url: string | null) {
 }
 
 export function sourceLabel({ source, image_url }: Pick<Car, 'source' | 'image_url'>) {
-  const image = image_url && safeWebUrl(image_url);
-  if (source === 'demo' && image && new URL(image).pathname.includes('/demo/vehicles/')) {
+  if (source === 'demo' && isDemoPhoto(image_url)) {
     return 'Демо · фото модели';
   }
   return vehicleSourceLabel[source];

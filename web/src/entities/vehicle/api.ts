@@ -13,8 +13,10 @@ import {
 } from '@/shared/api/money';
 import type { createApiClient } from '@/shared/api/client';
 import type { components, paths } from '@/shared/api/schema';
+import { carWithoutGallery, photoWriteSchema, readGallery } from './photos';
 
 export type Car = components['schemas']['Car'];
+export type CarDetail = components['schemas']['CarDetail'];
 export type CarInput = paths['/api/cars']['post']['requestBody']['content']['application/json'];
 export type CarPatch =
   paths['/api/cars/{car_id}']['patch']['requestBody']['content']['application/json'];
@@ -57,14 +59,25 @@ export function checkedMoneyResponse<T>(schema: z.ZodType, payload: T): T {
 
 const carsMoney = z.array(carMoney);
 
+function checkPhotoWrite(body: CarInput | CarPatch) {
+  const result = photoWriteSchema.safeParse(body);
+  if (!result.success) {
+    throw new ApiError('http', 'validation_error', result.error.issues[0]!.message, 422);
+  }
+}
+
 export const vehicleApi = {
   list: async (api: Api) =>
-    checkedMoneyResponse(carsMoney, await api.request<Car[]>('/api/cars', { money: true })),
-  detail: async (api: Api, id: string, signal: AbortSignal) =>
-    checkedMoneyResponse(
-      carMoney,
-      await api.request<Car>(vehiclePath(id), { signal, money: true }),
+    checkedMoneyResponse(carsMoney, await api.request<Car[]>('/api/cars', { money: true })).map(
+      carWithoutGallery,
     ),
+  detail: async (api: Api, id: string, signal: AbortSignal) => {
+    const car = checkedMoneyResponse(
+      carMoney,
+      await api.request<CarDetail>(vehiclePath(id), { signal, money: true }),
+    );
+    return { ...car, ...readGallery(car) };
+  },
   async summary(api: Api, id: string, signal: AbortSignal) {
     const payload = await api.request<unknown>(`${vehiclePath(id)}/summary`, {
       signal,
@@ -80,21 +93,31 @@ export const vehicleApi = {
     }
     return result.data;
   },
-  import: async (api: Api, body: ImportInput) =>
-    checkedMoneyResponse(
+  import: async (api: Api, body: ImportInput) => {
+    const listing = checkedMoneyResponse(
       listingMoney,
       await api.request<Listing>('/api/cars/import', { method: 'POST', body, money: true }),
-    ),
-  create: async (api: Api, body: CarInput) =>
-    checkedMoneyResponse(
-      carMoney,
-      await api.request<Car>('/api/cars', { method: 'POST', body, money: true }),
-    ),
-  patch: async (api: Api, id: string, body: CarPatch) =>
-    checkedMoneyResponse(
-      carMoney,
-      await api.request<Car>(vehiclePath(id), { method: 'PATCH', body, money: true }),
-    ),
+    );
+    return { ...listing, ...readGallery(listing) };
+  },
+  create: async (api: Api, body: CarInput) => {
+    checkPhotoWrite(body);
+    return carWithoutGallery(
+      checkedMoneyResponse(
+        carMoney,
+        await api.request<Car>('/api/cars', { method: 'POST', body, money: true }),
+      ),
+    );
+  },
+  patch: async (api: Api, id: string, body: CarPatch) => {
+    checkPhotoWrite(body);
+    return carWithoutGallery(
+      checkedMoneyResponse(
+        carMoney,
+        await api.request<Car>(vehiclePath(id), { method: 'PATCH', body, money: true }),
+      ),
+    );
+  },
   remove: (api: Api, id: string) => api.request<void>(vehiclePath(id), { method: 'DELETE' }),
 };
 

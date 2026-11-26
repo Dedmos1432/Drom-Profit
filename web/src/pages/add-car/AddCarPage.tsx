@@ -4,9 +4,10 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useSession } from '@/entities/session/SessionBoundary';
 import { vehicleApi } from '@/entities/vehicle/api';
 import type { CarInput, Listing } from '@/entities/vehicle/api';
+import { isDemoPhoto, vehicleGalleryImages } from '@/entities/vehicle/photos';
 import { sourceLabel } from '@/entities/vehicle/presentation';
 import { listingUrlSchema } from '@/entities/vehicle/validation';
-import { VehiclePhoto } from '@/entities/vehicle/VehiclePhoto';
+import { VehicleGallery } from '@/entities/vehicle/VehicleGallery';
 import { VehicleForm } from '@/features/add-vehicle/VehicleForm';
 import { useSaveVehicle } from '@/features/add-vehicle/useSaveVehicle';
 import { importErrorMessage, ListingLinkForm } from '@/features/import-vehicle/ListingLinkForm';
@@ -175,7 +176,18 @@ export function AddCarPage() {
                   <code>{preview.listing.listing_url ?? preview.requestedUrl}</code>
                 </p>
                 {preview.listing.image_url && (
-                  <VehiclePhoto value={preview.listing.image_url} className={styles.previewPhoto} />
+                  <VehicleGallery
+                    key={preview.version}
+                    images={vehicleGalleryImages(preview.listing)}
+                    modelPhotos={
+                      preview.listing.source === 'demo' && isDemoPhoto(preview.listing.image_url)
+                    }
+                    className={
+                      preview.listing.image_urls.length === 1
+                        ? styles.previewPhoto
+                        : styles.previewGallery
+                    }
+                  />
                 )}
                 <VehicleForm
                   key={preview.version}

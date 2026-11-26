@@ -84,6 +84,44 @@ it('identifies the previous preview and retains its edits after an unsuccessful 
   ]);
 });
 
+it('reads an old one-photo preview and discards unsafe or inconsistent references before caching', async () => {
+  const [fixture] = listings;
+  const image = 'https://images.example.test/camry.jpg';
+  const second = 'https://images.example.test/rear.jpg';
+  const legacy = { ...fixture, image_url: image, image_urls: undefined };
+  const api = createApiClient({ baseUrl: config.baseUrl });
+  server.use(http.post(previewUrl, () => HttpResponse.json(legacy)));
+  await expect(vehicleApi.import(api, { url: canonical })).resolves.toMatchObject({
+    image_url: image,
+    image_urls: [image],
+  });
+  server.use(
+    http.post(previewUrl, () =>
+      HttpResponse.json({
+        ...legacy,
+        image_urls: [second, 'file:///tmp/car.jpg'],
+      }),
+    ),
+  );
+  await expect(vehicleApi.import(api, { url: canonical })).resolves.toMatchObject({
+    image_url: image,
+    image_urls: [image],
+  });
+  server.use(
+    http.post(previewUrl, () =>
+      HttpResponse.json({
+        ...legacy,
+        image_url: null,
+        image_urls: [image, 'https://127.0.0.1/photo.jpg', second],
+      }),
+    ),
+  );
+  await expect(vehicleApi.import(api, { url: canonical })).resolves.toMatchObject({
+    image_url: image,
+    image_urls: [image, second],
+  });
+});
+
 it.each([
   [400, 'invalid_url', 'Укажите ссылку на объявление Дрома.'],
   [403, 'source_forbidden', /У источника нет доступных данных/],

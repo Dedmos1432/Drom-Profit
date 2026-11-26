@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { URL } from 'node:url';
 import { setupServer } from 'msw/node';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { vehiclePath } from '@/entities/vehicle/api';
@@ -54,6 +56,16 @@ it('uses the same five models for showcase and editable imports while keeping as
       }),
     );
     expect(listing.image_url).toContain('/demo/vehicles/');
+    expect(listing.image_urls).toHaveLength(3);
+    expect(listing.image_url).toBe(listing.image_urls[0]);
+    for (const path of listing.image_urls) {
+      expect(existsSync(new URL('../../public' + path, import.meta.url)), path).toBe(true);
+    }
+    expect(await api.request(vehiclePath(car.id))).toEqual({
+      ...car,
+      image_urls: listing.image_urls,
+    });
+    expect(car).not.toHaveProperty('image_urls');
     expect(listing).not.toHaveProperty('expenses');
   }
   expect(await api.request('/api/cars')).toEqual(cars);
@@ -106,7 +118,7 @@ it('previews without saving, persists a created car, enforces ownership and dele
 
   server.resetHandlers(...handlers(config, localStorage));
   expect(await owner.request('/api/cars')).toEqual([car]);
-  expect(await owner.request(detail)).toEqual(car);
+  expect(await owner.request(detail)).toEqual({ ...car, image_urls: [] });
   expect(await owner.request(summary)).toMatchObject({
     listing_price: 900000,
     assessment_status: 'incomplete',
@@ -119,6 +131,33 @@ it('previews without saving, persists a created car, enforces ownership and dele
   server.resetHandlers(...handlers(config, localStorage));
   expect(await owner.request('/api/cars')).toEqual([]);
   await expect(owner.request(detail)).rejects.toMatchObject({ status: 404 });
+});
+
+it('applies the gallery write rules and keeps confirmation flags on photo-only changes', async () => {
+  const api = await openSession();
+  const listing = await api.request<Listing>('/api/cars/import', {
+    method: 'POST',
+    body: { url: 'https://auto.drom.ru/demo/1.html' },
+  });
+  const created = await api.request<Car>('/api/cars', { method: 'POST', body: listing });
+  const path = vehiclePath(created.id);
+  const [first, second, third] = listing.image_urls;
+  const patch = (body: unknown) => api.request<Car>(path, { method: 'PATCH', body });
+  await patch({ expenses_reviewed: true, benefits_reviewed: true });
+  await expect(patch({ image_url: second })).resolves.toMatchObject({
+    image_url: second,
+    expenses_reviewed: true,
+    benefits_reviewed: true,
+  });
+  await expect(patch({ image_url: null, image_urls: [first] })).rejects.toMatchObject({
+    status: 422,
+    code: 'validation_error',
+  });
+  expect(await api.request(path)).toMatchObject({ image_urls: [second, first, third] });
+  await patch({ image_urls: [third, third, first] });
+  expect(await api.request(path)).toMatchObject({ image_url: third, image_urls: [third, first] });
+  await patch({ image_urls: [] });
+  expect(await api.request(path)).toMatchObject({ image_url: null, image_urls: [] });
 });
 
 it('canonicalizes imports and keeps request validation distinct from URL errors', async () => {

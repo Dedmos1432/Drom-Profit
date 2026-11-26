@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Request, Response
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select, text
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, undefer
 
 from .. import schemas
 from ..db import Database, session_for
 from ..errors import APIError, not_found
-from ..formats import validate_uri
+from ..formats import IMAGE_COUNT_LIMIT, validate_uri
 from ..models import Car
 from ..services.calculation import compare, summarize
 from ..services.listing_import import ListingImportError
@@ -42,7 +42,12 @@ async def preview_listing(
 
 @router.post("/cars", status_code=201)
 def create_car(body: schemas.CarInput, db: Database, owner: Owner) -> schemas.Car:
-    car = Car(session_id=owner, **body.model_dump(mode="json"))
+    fields = body.model_dump(mode="json")
+    if "image_urls" not in body.model_fields_set and body.image_url is not None:
+        fields["image_urls"] = [body.image_url]
+    photos = fields["image_urls"]
+    fields["image_url"] = photos[0] if photos else None
+    car = Car(session_id=owner, **fields)
     db.add(car)
     db.flush()
     result = schemas.Car.model_validate(car)
@@ -58,8 +63,12 @@ def list_cars(request: Request, owner: Owner) -> list[schemas.Car]:
         return [schemas.Car.model_validate(car) for car in cars]
 
 
-def require_car(car_id: str, db: Session, owner: str, *, lock: bool = False) -> Car:
+def require_car(
+    car_id: str, db: Session, owner: str, *, lock: bool = False, with_gallery: bool = False,
+) -> Car:
     query = select(Car).where(Car.id == car_id, Car.session_id == owner)
+    if with_gallery:
+        query = query.options(undefer(Car.image_urls))
     if lock:
         db.execute(text("SET LOCAL lock_timeout = '3s'"))
         query = query.with_for_update(of=Car)
@@ -70,16 +79,27 @@ def require_car(car_id: str, db: Session, owner: str, *, lock: bool = False) -> 
 
 
 @router.get("/cars/{car_id}")
-def get_car(car_id: str, request: Request, owner: Owner) -> schemas.Car:
+def get_car(car_id: str, request: Request, owner: Owner) -> schemas.CarDetail:
     with session_for(request.app.state.snapshot_engine) as db:
-        return schemas.Car.model_validate(require_car(car_id, db, owner))
+        return schemas.CarDetail.model_validate(require_car(car_id, db, owner, with_gallery=True))
 
 
 @router.patch("/cars/{car_id}")
-def patch_car(body: schemas.CarPatch, car_id: str, db: Database, owner: Owner) -> schemas.Car:
-    car = require_car(car_id, db, owner, lock=True)
-    reviewed_fields = ("expenses_reviewed", "benefits_reviewed")
+def patch_car(body: schemas.CheckedCarPatch, car_id: str, db: Database, owner: Owner) -> schemas.Car:
     changes = jsonable_encoder(body)
+    has_photo_fields = "image_urls" in changes or "image_url" in changes
+    car = require_car(car_id, db, owner, lock=True, with_gallery=has_photo_fields)
+    if has_photo_fields:
+        photos = changes.pop("image_urls", None)
+        main = changes.pop("image_url", None)
+        if photos is None:
+            remaining = schemas.readable_image_references(car.image_urls)
+            photos = [] if main is None else list(dict.fromkeys([main, *remaining]))
+        if len(photos) > IMAGE_COUNT_LIMIT:
+            raise APIError(422, "validation_error", "Допустимо не более 64 фотографий")
+        car.image_urls = photos
+        car.image_url = photos[0] if photos else None
+    reviewed_fields = ("expenses_reviewed", "benefits_reviewed")
     flags = {field: changes.pop(field) for field in reviewed_fields if field in changes}
     if any(getattr(car, field) != value for field, value in changes.items()):
         car.expenses_reviewed = car.benefits_reviewed = False

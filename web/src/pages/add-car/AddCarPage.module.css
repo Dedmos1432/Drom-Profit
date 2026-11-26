@@ -27,6 +27,10 @@
   max-inline-size: var(--dp-sizing-listing-thumb);
 }
 
+.previewGallery {
+  max-inline-size: var(--dp-sizing-listing-photo-max);
+}
+
 @media (min-width: 600px) {
   .importPanel {
     padding: var(--dp-spacing-panel);

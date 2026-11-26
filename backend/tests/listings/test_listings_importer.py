@@ -91,7 +91,7 @@ def test_all_demo_fixtures_keep_the_complete_public_contract():
     actual = [run(importer(row["listing_url"])).as_dict() for row in expected]
     assert len(actual) == 3
     assert actual == expected
-    assert all(len(row) == 18 for row in actual)
+    assert all(len(row) == 19 for row in actual)
 
 
 @pytest.mark.parametrize("hosts", ["", "*.drom.ru", "drom.ru", "sub.city.drom.ru", "other.example"])

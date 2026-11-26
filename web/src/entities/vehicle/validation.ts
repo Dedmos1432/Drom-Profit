@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { positiveMoney, rublesText } from '@/shared/api/money';
 import type { CarInput, CarPatch } from './api';
+import { consistentPhotoFields, photoReferenceSchema, photoReferencesSchema } from './photos';
 
 const brand = z.string().trim().min(1, 'Укажите марку.');
 const model = z.string().trim().min(1, 'Укажите модель.');
@@ -37,7 +38,7 @@ export const listingUrlSchema = z
   .min(1, 'Введите ссылку на объявление.')
   .refine((url) => canonicalDemoListingUrl(url) !== null, 'Укажите ссылку на объявление Дрома.');
 
-export const carInputSchema = z.strictObject({
+const carInputFields = z.strictObject({
   source: z.enum(['manual', 'drom', 'demo']),
   listing_id: z.string().nullable().optional(),
   fetched_at: z.iso.datetime({ offset: true }).nullable().optional(),
@@ -53,15 +54,20 @@ export const carInputSchema = z.strictObject({
   transmission: z.string().nullable().optional(),
   drive_type: z.string().nullable().optional(),
   city: z.string().nullable().optional(),
-  image_url: uri.nullable().optional(),
+  image_url: photoReferenceSchema.nullable().optional(),
+  image_urls: photoReferencesSchema.optional(),
   listing_url: uri.nullable().optional(),
   market_valuation: positiveMoney.nullable().optional(),
 }) satisfies z.ZodType<CarInput>;
 
-export const carPatchSchema = carInputSchema
+const photoConflict = 'Основная фотография должна быть первой в галерее.';
+export const carInputSchema = carInputFields.refine(consistentPhotoFields, photoConflict);
+
+export const carPatchSchema = carInputFields
   .omit({ source: true, listing_id: true, fetched_at: true })
   .extend({ expenses_reviewed: z.boolean(), benefits_reviewed: z.boolean() })
-  .partial() satisfies z.ZodType<CarPatch>;
+  .partial()
+  .refine(consistentPhotoFields, photoConflict) satisfies z.ZodType<CarPatch>;
 
 const optionalText = z
   .string()
@@ -95,7 +101,7 @@ export const carFormSchema = z.object({
   transmission: optionalText,
   drive_type: optionalText,
   city: optionalText,
-  image_url: optionalText.pipe(uri.nullable()),
+  image_url: optionalText.pipe(photoReferenceSchema.nullable()),
   listing_url: optionalText.pipe(uri.nullable()),
   market_valuation: z
     .string()
