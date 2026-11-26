@@ -1,0 +1,21 @@
+.fields {
+  border: 0;
+  padding: 0;
+  margin: 0 0 var(--dp-spacing-row);
+  min-inline-size: 0;
+  display: grid;
+  gap: var(--dp-spacing-small);
+}
+
+.actions {
+  margin-block-start: var(--dp-spacing-row);
+}
+.match summary {
+  color: var(--dp-color-semantic-text-link);
+  cursor: pointer;
+  padding-block: var(--dp-spacing-tiny);
+}
+
+.match[open] summary {
+  margin-block-end: var(--dp-spacing-small);
+}

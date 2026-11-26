@@ -1,0 +1,17 @@
+# Explicit local overlay for an authorized network test. The source still defaults to demo.
+services:
+  backend:
+    networks:
+      database: {}
+      listing-egress:
+        gw_priority: 1
+    environment:
+      DROM_LISTINGS_ACCESS_APPROVED: ${DROM_LISTINGS_ACCESS_APPROVED:-}
+      DROM_LISTINGS_HOSTS: ${DROM_LISTINGS_HOSTS:-}
+      DROM_LISTINGS_REDIRECT_HOSTS: ${DROM_LISTINGS_REDIRECT_HOSTS:-}
+  postgres-loopback:
+    profiles: [host-db]
+
+networks:
+  listing-egress:
+    driver: bridge

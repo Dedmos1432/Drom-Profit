@@ -1,0 +1,141 @@
+{
+  "101": {
+    "expenses": [
+      {
+        "kind": "repair",
+        "title": "Замена тормозных колодок",
+        "amount": 12000
+      },
+      {
+        "kind": "maintenance",
+        "title": "Замена масла и фильтров",
+        "amount": 9000
+      },
+      {
+        "kind": "repair",
+        "title": "Замена стоек стабилизатора",
+        "amount": 8000
+      }
+    ],
+    "benefits": [
+      {
+        "title": "Комплект зимней резины",
+        "amount": 30000
+      },
+      {
+        "title": "Сигнализация с автозапуском",
+        "amount": 15000
+      }
+    ],
+    "notes": [
+      {
+        "kind": "inspection",
+        "text": "На пробной поездке проверить тормоза и работу кондиционера."
+      }
+    ],
+    "expenses_reviewed": true,
+    "benefits_reviewed": true
+  },
+  "102": {
+    "expenses": [
+      {
+        "kind": "repair",
+        "title": "Ремонт подвески",
+        "amount": 65000
+      },
+      {
+        "kind": "maintenance",
+        "title": "Обслуживание коробки передач",
+        "amount": 25000
+      },
+      {
+        "kind": "repair",
+        "title": "Кузовной ремонт",
+        "amount": 40000
+      }
+    ],
+    "benefits": [
+      {
+        "title": "Дополнительный комплект колёс",
+        "amount": 25000
+      }
+    ],
+    "notes": [
+      {
+        "kind": "inspection",
+        "text": "Перед покупкой провести диагностику подвески и коробки передач."
+      }
+    ],
+    "expenses_reviewed": true,
+    "benefits_reviewed": true
+  },
+  "103": {
+    "expenses": [
+      {
+        "kind": "repair",
+        "title": "Ремонт кондиционера",
+        "amount": null
+      },
+      {
+        "kind": "maintenance",
+        "title": "Замена технических жидкостей",
+        "amount": 15000
+      }
+    ],
+    "benefits": [
+      {
+        "title": "Камера заднего вида",
+        "amount": 12000
+      }
+    ],
+    "notes": [
+      {
+        "kind": "inspection",
+        "text": "Уточнить стоимость ремонта кондиционера после диагностики."
+      }
+    ],
+    "expenses_reviewed": false,
+    "benefits_reviewed": true
+  },
+  "104": {
+    "expenses": [],
+    "benefits": [
+      {
+        "title": "Багажник на крыше",
+        "amount": 20000
+      },
+      {
+        "title": "Предпусковой подогреватель",
+        "amount": 35000
+      }
+    ],
+    "notes": [
+      {
+        "kind": "inspection",
+        "text": "По итогам демонстрационного осмотра существенных расходов не выявлено."
+      }
+    ],
+    "expenses_reviewed": true,
+    "benefits_reviewed": true
+  },
+  "105": {
+    "expenses": [],
+    "benefits": [],
+    "notes": [
+      {
+        "kind": "inspection",
+        "text": "Требуется осмотр подвески."
+      },
+      {
+        "kind": "report",
+        "text": "Необходимо проверить историю эксплуатации."
+      },
+      {
+        "kind": "seller",
+        "text": "Уточнить комплектность у продавца."
+      }
+    ],
+    "expenses_reviewed": false,
+    "benefits_reviewed": false
+  }
+}

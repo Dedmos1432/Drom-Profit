@@ -1,0 +1,9 @@
+dist/
+coverage/
+package-lock.json
+docs/research/
+public/mockServiceWorker.js
+src/shared/api/schema.ts
+src/shared/styles/tokens.css
+docs/DROM_VISUAL_AUDIT.md
+docs/design-tokens.json

@@ -1,0 +1,13 @@
+.venv/
+venv/
+**/__pycache__/
+.pytest_cache/
+*.sqlite
+*.sqlite3*
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*
+!.env.example
+/HANDOFF.md

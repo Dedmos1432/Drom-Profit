@@ -1,0 +1,108 @@
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--dp-component-alert-gap);
+  min-inline-size: 0;
+  padding: var(--dp-component-alert-padding);
+  border-radius: var(--dp-component-alert-radius);
+}
+
+.alert > svg {
+  inline-size: var(--dp-icon-default);
+  block-size: var(--dp-icon-default);
+  flex: none;
+}
+
+.alertDescription {
+  margin-block-start: var(--dp-spacing-hairline);
+}
+
+.info {
+  background: var(--dp-color-semantic-status-info-surface);
+  color: var(--dp-color-semantic-status-info-text);
+}
+
+.success {
+  background: var(--dp-color-semantic-status-success-surface);
+  color: var(--dp-color-semantic-status-success-text);
+}
+
+.warning {
+  background: var(--dp-color-semantic-status-warning-surface);
+  color: var(--dp-color-semantic-status-warning-text);
+}
+
+.error {
+  background: var(--dp-color-semantic-status-error-surface);
+  color: var(--dp-color-semantic-status-error-text);
+}
+
+.empty,
+.errorState {
+  display: grid;
+  justify-items: start;
+  gap: var(--dp-spacing-small);
+}
+
+.empty > strong {
+  font-size: var(--dp-typography-size-card-title);
+  line-height: var(--dp-typography-line-height-card-title);
+}
+
+.emptyDescription {
+  color: var(--dp-color-semantic-text-secondary);
+}
+
+.errorState > :first-child {
+  inline-size: 100%;
+}
+
+.skeleton {
+  display: grid;
+  gap: var(--dp-spacing-small);
+  width: 100%;
+}
+
+.skeleton > span {
+  display: block;
+  min-block-size: var(--dp-typography-line-height-caption);
+  border-radius: var(--dp-radius-mark);
+  background: var(--dp-color-semantic-background-pressed);
+}
+
+.skeleton > span:nth-child(3n + 2) {
+  inline-size: 83%;
+}
+.skeleton > span:nth-child(3n + 3) {
+  inline-size: 62%;
+}
+
+.spinner {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dp-spacing-tiny);
+}
+
+.spinner svg {
+  color: var(--dp-color-semantic-text-link);
+  inline-size: var(--dp-icon-default);
+  block-size: var(--dp-icon-default);
+  flex: none;
+}
+
+.spinnerSmall svg {
+  inline-size: var(--dp-icon-small);
+  block-size: var(--dp-icon-small);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .spinner svg {
+    animation: rotate var(--dp-motion-spinner) linear infinite;
+  }
+}
+
+@keyframes rotate {
+  to {
+    transform: rotate(1turn);
+  }
+}

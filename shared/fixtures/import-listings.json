@@ -14,7 +14,12 @@
     "transmission": "Автомат",
     "drive_type": "Передний",
     "city": "Владивосток",
-    "image_url": null,
+    "image_url": "/demo/vehicles/camry-xv50-silver.jpg",
+    "image_urls": [
+      "/demo/vehicles/camry-xv50-silver.jpg",
+      "/demo/vehicles/camry-xv50-white.jpg",
+      "/demo/vehicles/camry-xv50-engine.jpg"
+    ],
     "listing_url": "https://auto.drom.ru/demo/1.html",
     "market_valuation": null,
     "fetched_at": null
@@ -34,7 +39,8 @@
     "transmission": "Автомат",
     "drive_type": "Передний",
     "city": "Владивосток",
-    "image_url": null,
+    "image_url": "/demo/vehicles/camry-xv50-white.jpg",
+    "image_urls": ["/demo/vehicles/camry-xv50-white.jpg"],
     "listing_url": "https://auto.drom.ru/demo/2.html",
     "market_valuation": null,
     "fetched_at": null
@@ -55,6 +61,7 @@
     "drive_type": "Передний",
     "city": "Владивосток",
     "image_url": null,
+    "image_urls": [],
     "listing_url": "https://auto.drom.ru/demo/3.html",
     "market_valuation": null,
     "fetched_at": null

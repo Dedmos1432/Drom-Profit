@@ -1,0 +1,155 @@
+name: drom-core
+x-postgres: &postgres
+  image: postgres:17.6-bookworm
+  pull_policy: ${DROM_POSTGRES_PULL_POLICY:-missing}
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U drom -d \"$$POSTGRES_DB\""]
+    interval: 3s
+    timeout: 3s
+    retries: 15
+
+x-app: &app
+  image: ${COMPOSE_PROJECT_NAME}-backend:local
+  pull_policy: never
+  networks: [database]
+  environment:
+    DROM_DATABASE_URL: postgresql+psycopg://drom@postgres:5432/drom_profit
+    PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD locally}
+    DROM_DB_POOL_SIZE: ${DROM_DB_POOL_SIZE:-10}
+    DROM_DB_MAX_OVERFLOW: ${DROM_DB_MAX_OVERFLOW:-5}
+    DROM_CORS_ORIGINS: ${DROM_CORS_ORIGINS:-}
+    DROM_LISTINGS_SOURCE: ${DROM_LISTINGS_SOURCE:-demo}
+    DROM_LISTINGS_EXTRA_FIXTURE: ${DROM_LISTINGS_EXTRA_FIXTURE:-}
+  volumes: &shared
+    - type: bind
+      source: ../shared
+      target: /srv/shared
+      read_only: true
+      bind:
+        create_host_path: false
+
+x-loopback: &loopback
+  image: python:3.14.0-slim-bookworm
+  pull_policy: missing
+  user: "10001:10001"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  sysctls:
+    net.ipv4.ip_forward: "0"
+  volumes:
+    - ./loopback_proxy.py:/loopback_proxy.py:ro
+  entrypoint: ["python", "-B", "/loopback_proxy.py"]
+
+services:
+  postgres:
+    <<: *postgres
+    environment:
+      POSTGRES_USER: drom
+      POSTGRES_DB: drom_profit
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD locally}
+    networks: [database]
+    volumes: [postgres_data:/var/lib/postgresql/data]
+
+  migrate:
+    <<: *app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    restart: "no"
+
+  backend:
+    <<: *app
+    build:
+      context: .
+      target: runtime
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "from http.client import HTTPConnection; c=HTTPConnection('127.0.0.1',8000,timeout=2); c.request('GET','/openapi.json'); assert c.getresponse().status==200"]
+      interval: 10s
+      timeout: 4s
+      retries: 5
+      start_period: 5s
+
+  postgres-test:
+    <<: *postgres
+    profiles: [test]
+    environment:
+      POSTGRES_USER: drom
+      POSTGRES_DB: drom_profit_test
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD locally}
+    networks: [test-database]
+    tmpfs: [/var/lib/postgresql/data]
+
+  tests:
+    profiles: [test]
+    image: ${COMPOSE_PROJECT_NAME}-tests:local
+    pull_policy: never
+    build:
+      context: .
+      target: test
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    network_mode: service:postgres-test
+    environment:
+      DROM_TEST_DATABASE_URL: postgresql+psycopg://drom@127.0.0.1:5432/drom_profit_test
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD locally}
+      DROM_DB_POOL_SIZE: ${DROM_DB_POOL_SIZE:-10}
+      DROM_DB_MAX_OVERFLOW: ${DROM_DB_MAX_OVERFLOW:-5}
+      DROM_LOAD_ROUNDS: ${DROM_LOAD_ROUNDS:-5}
+      DROM_LISTINGS_SOURCE: demo
+    volumes: *shared
+
+  api-loopback:
+    <<: *loopback
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      ingress:
+        gw_priority: 1
+      database: {}
+    command: ["8000", "backend", "8000"]
+    ports: ["127.0.0.1:8000:8000"]
+
+  postgres-loopback:
+    <<: *loopback
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      ingress:
+        gw_priority: 1
+      database: {}
+    command: ["5432", "postgres", "5432"]
+    ports: ["127.0.0.1:55432:5432"]
+
+  postgres-test-loopback:
+    <<: *loopback
+    profiles: [test]
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    networks:
+      ingress:
+        gw_priority: 1
+      test-database: {}
+    command: ["5432", "postgres-test", "5432"]
+    ports: ["127.0.0.1:55433:5432"]
+
+networks:
+  ingress:
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+  database:
+    internal: true
+  test-database:
+    internal: true
+volumes:
+  postgres_data:

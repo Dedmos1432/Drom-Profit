@@ -1,0 +1,30 @@
+.dialog {
+  inline-size: min(var(--dp-layout-dialog-max), calc(100% - var(--dp-page-gutter) * 2));
+  max-block-size: calc(100% - var(--dp-spacing-roomy));
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  color: var(--dp-color-semantic-text-primary);
+  background: var(--dp-color-semantic-background-surface);
+  border: var(--dp-border-thin) solid var(--dp-color-semantic-border-divider);
+  border-radius: var(--dp-radius-panel-large);
+  box-shadow: var(--dp-shadow-overlay);
+}
+
+.dialog::backdrop {
+  background: var(--dp-color-semantic-background-overlay);
+}
+
+.content {
+  display: grid;
+  gap: var(--dp-spacing-row);
+  padding: var(--dp-spacing-panel);
+}
+
+.heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--dp-spacing-tiny);
+}
